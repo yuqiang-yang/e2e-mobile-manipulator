@@ -159,7 +159,12 @@ class ArmReacher(ArmBase, ArmReacherConfig):
     """
     .. inheritance-diagram:: curobo.rollout.arm_reacher.ArmReacher
     """
-
+    def __repr__(self):
+        return f"ArmReacher: batch:{self.batch_size} \
+            cuda_graph:{self._cuda_graph_valid} \
+            metric_cuda_graph:{self._metrics_cuda_graph_init} \
+            constraint_cuda_graph:{self._rollout_constraint_cuda_graph_init} \
+            \n"
     @profiler.record_function("arm_reacher/init")
     def __init__(self, config: Optional[ArmReacherConfig] = None):
         if config is not None:

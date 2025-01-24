@@ -58,6 +58,15 @@ class WrapResult:
 
 
 class WrapBase(WrapConfig):
+    
+    def __repr__(self):
+        output = "WrapBase:"
+        output += f"safety_rollout: {self.safety_rollout}\n"
+        output += f"rollout_fn: {self.rollout_fn}\n"
+        for i, opt in enumerate(self.optimizers):
+            output += f"optimizer{i}_cuda: {opt.cu_opt_init}\n"
+        return output
+    
     def __init__(self, config: Optional[WrapConfig] = None):
         if config is not None:
             WrapConfig.__init__(self, **vars(config))
