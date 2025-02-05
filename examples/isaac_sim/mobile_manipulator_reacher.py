@@ -1,9 +1,5 @@
 import isaacsim
 import torch
-
-a = torch.zeros(4, device="cuda:0")
-
-# Standard Library
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -39,31 +35,6 @@ parser.add_argument(
     help="When True, runs in reactive mode",
     default=False,
 )
-
-parser.add_argument(
-    "--constrain_grasp_approach",
-    action="store_true",
-    help="When True, approaches grasp with fixed orientation and motion only along z axis.",
-    default=False,
-)
-
-parser.add_argument(
-    "--reach_partial_pose",
-    nargs=6,
-    metavar=("qx", "qy", "qz", "x", "y", "z"),
-    help="Reach partial pose",
-    type=float,
-    default=None,
-)
-parser.add_argument(
-    "--hold_partial_pose",
-    nargs=6,
-    metavar=("qx", "qy", "qz", "x", "y", "z"),
-    help="Hold partial pose while moving to goal",
-    type=float,
-    default=None,
-)
-
 
 args = parser.parse_args()
 
@@ -115,13 +86,9 @@ from curobo.wrap.reacher.motion_gen import (
     MotionGen,
     MotionGenConfig,
     MotionGenPlanConfig,
-    PoseCostMetric,
 )
 
 ############################################################
-
-
-########### OV #################;;;;;
 
 
 def main():
@@ -369,17 +336,7 @@ def main():
             # ik_result = ik_solver.solve_single(ik_goal, cu_js.position.view(1,-1), cu_js.position.view(1,1,-1))
 
             succ = result.success.item()  # ik_result.success.item()
-            if num_targets == 1:
-                if args.constrain_grasp_approach:
-                    pose_metric = PoseCostMetric.create_grasp_approach_metric()
-                if args.reach_partial_pose is not None:
-                    reach_vec = motion_gen.tensor_args.to_device(args.reach_partial_pose)
-                    pose_metric = PoseCostMetric(
-                        reach_partial_pose=True, reach_vec_weight=reach_vec
-                    )
-                if args.hold_partial_pose is not None:
-                    hold_vec = motion_gen.tensor_args.to_device(args.hold_partial_pose)
-                    pose_metric = PoseCostMetric(hold_partial_pose=True, hold_vec_weight=hold_vec)
+
             if succ:
                 num_targets += 1
                 cmd_plan = result.get_interpolated_plan()
