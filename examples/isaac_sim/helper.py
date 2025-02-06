@@ -19,7 +19,7 @@ from omni.isaac.core import World
 from omni.isaac.core.materials import OmniPBR
 from omni.isaac.core.objects import cuboid
 from omni.isaac.core.robots import Robot
-from pxr import UsdPhysics
+from pxr import UsdPhysics, UsdGeom
 
 # CuRobo
 from curobo.util.logger import log_warn
@@ -168,3 +168,102 @@ class VoxelManager:
     def clear(self):
         for i in range(len(self.cuboid_list)):
             self.cuboid_list[i].set_local_pose(translation=np.ravel([0, 0, -10.0]))
+            
+            
+import random
+import math
+from pxr import Usd, UsdGeom, UsdPhysics, UsdShade, Sdf
+
+def _set_random_color(prim):
+    r = random.uniform(0, 1)
+    g = random.uniform(0, 1)
+    b = random.uniform(0, 1)
+    color = (r, g, b)
+
+    metallic = random.uniform(0, 1)
+    roughness = random.uniform(0, 1)
+    material_binding_api = UsdShade.MaterialBindingAPI(prim)
+    material_path = prim.GetPath().AppendChild("Material")
+    material = UsdShade.Material.Define(prim.GetStage(), material_path)
+    shader = UsdShade.Shader.Define(prim.GetStage(), material_path.AppendChild("Shader"))
+    shader.CreateIdAttr("UsdPreviewSurface")
+    shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).Set(color)
+    shader.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(metallic)
+    shader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(roughness)
+    material.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), "surface")
+    material_binding_api.Bind(material)
+
+def _generate_trajectory():
+    amplitude = random.uniform(0.5, 2.0)
+    angle = random.uniform(0, 2 * math.pi)
+    period = random.randint(200, 500)
+    return amplitude, angle, period
+
+def calculate_position_offset(step, amplitude, angle, period):
+    phase = 2 * math.pi * (step % period) / period
+    dx = amplitude * math.sin(phase) * math.cos(angle)
+    dy = amplitude * math.sin(phase) * math.sin(angle)
+    dz = 0  
+    return dx, dy, dz
+
+def add_random_objects(my_world, num_cylinders=5, num_spheres=5, dynamic=True):
+    stage = my_world.stage
+
+    # Function to create a cylinder
+    def create_cylinder(stage, path, radius=0.5, height=2.0):
+        cylinder_prim = stage.DefinePrim(path, "Cylinder")
+        cylinder_geom = UsdGeom.Cylinder(cylinder_prim)
+        cylinder_geom.GetRadiusAttr().Set(radius)
+        cylinder_geom.GetHeightAttr().Set(height)
+        return cylinder_prim
+
+    # Function to create a sphere
+    def create_sphere(stage, path, radius=0.5):
+        sphere_prim = stage.DefinePrim(path, "Sphere")
+        sphere_geom = UsdGeom.Sphere(sphere_prim)
+        sphere_geom.GetRadiusAttr().Set(radius)
+        return sphere_prim
+
+    # Function to add collision properties
+    def add_collision(prim):
+        collision_api = UsdPhysics.CollisionAPI.Apply(prim)
+        return collision_api
+
+    prims_with_trajectories = []
+
+    # Add random cylinders
+    for i in range(num_cylinders):
+        x = random.uniform(-5, 5)
+        y = random.uniform(-5, 5)
+        z = random.uniform(0, 0.5)
+        if np.linalg.norm([x, y]) < 1.0:
+            continue
+        radius = random.uniform(0.2, 0.6)
+        path = f"/World/Cylinder_{i}"
+        cylinder_prim = create_cylinder(stage, path, radius)
+        UsdGeom.XformCommonAPI(cylinder_prim).SetTranslate((x, y, z))
+        # add_collision(cylinder_prim)
+        _set_random_color(cylinder_prim)
+        amplitude, angle, period = _generate_trajectory()
+        amplitude = amplitude if dynamic else 0.0
+        prims_with_trajectories.append((cylinder_prim, (x, y, z), amplitude, angle, period))
+
+    # Add random spheres
+    for i in range(num_spheres):
+        x = random.uniform(-5, 5)
+        y = random.uniform(-5, 5)
+        z = random.uniform(1, 3)  # Suspended in the air
+        if np.linalg.norm([x, y]) < 1.0:
+            continue
+        radius = random.uniform(0.2, 0.6)
+        path = f"/World/Sphere_{i}"
+        sphere_prim = create_sphere(stage, path, radius)
+        UsdGeom.XformCommonAPI(sphere_prim).SetTranslate((x, y, z))
+        # add_collision(sphere_prim)
+        _set_random_color(sphere_prim)
+        amplitude, angle, period = _generate_trajectory()
+        amplitude = amplitude if dynamic else 0.0
+        prims_with_trajectories.append((sphere_prim, (x, y, z), amplitude, angle, period))
+
+    print(f"Added {num_cylinders} cylinders and {num_spheres} spheres to the world.")
+    return prims_with_trajectories

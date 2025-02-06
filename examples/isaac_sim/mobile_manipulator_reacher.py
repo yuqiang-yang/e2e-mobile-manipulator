@@ -56,12 +56,13 @@ from typing import Dict
 # Third Party
 import carb
 import numpy as np
-from helper import add_extensions, add_robot_to_scene
+from helper import *
 from omni.isaac.core import World
 from omni.isaac.core.objects import cuboid, sphere
 
 ########### OV #################
 from omni.isaac.core.utils.types import ArticulationAction
+import omni.kit.actions.core
 
 # CuRobo
 # from curobo.wrap.reacher.ik_solver import IKSolver, IKSolverConfig
@@ -113,7 +114,7 @@ def main():
         color=np.array([1.0, 0, 0]),
         size=0.05,
     )
-
+    
     setup_curobo_logger("warn")
     past_pose = None
     n_obstacle_cuboids = 30
@@ -212,6 +213,16 @@ def main():
     target_orientation = None
     past_orientation = None
     pose_metric = None
+    step_index = 0
+    ##### Isaac custom config #######
+    action_registry = omni.kit.actions.core.get_action_registry()
+
+    # switches to camera lighting
+    action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_camera")
+    action.execute()
+    prims_with_trajectories = add_random_objects(my_world, 10, 10, dynamic=False)
+    ##### Isaac custom config #######
+    
     while simulation_app.is_running():
         my_world.step(render=True)
         if not my_world.is_playing():
@@ -223,6 +234,14 @@ def main():
             continue
 
         step_index = my_world.current_time_step_index
+        
+        for prim, initial_position, amplitude, angle, period in prims_with_trajectories:
+            dx, dy, dz = calculate_position_offset(step_index, amplitude, angle, period)
+            new_x = initial_position[0] + dx
+            new_y = initial_position[1] + dy
+            new_z = initial_position[2] + dz
+            UsdGeom.XformCommonAPI(prim).SetTranslate((new_x, new_y, new_z))
+
         # print(step_index)
         if articulation_controller is None:
             # robot.initialize()
@@ -386,7 +405,7 @@ def main():
             cmd_idx += 1
             for _ in range(2):
                 my_world.step(render=False)
-            print(f"cmd idx:{cmd_idx}/{len(cmd_plan.position)} pos:{cmd_state.position.cpu().numpy()} vel:{cmd_state.velocity.cpu().numpy()}")
+            # print(f"cmd idx:{cmd_idx}/{len(cmd_plan.position)} pos:{cmd_state.position.cpu().numpy()} vel:{cmd_state.velocity.cpu().numpy()}")
             if cmd_idx >= len(cmd_plan.position):
                 cmd_idx = 0
                 cmd_plan = None
