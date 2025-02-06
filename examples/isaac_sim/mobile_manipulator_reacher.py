@@ -109,7 +109,7 @@ def main():
     # Make a target to follow
     target = cuboid.VisualCuboid(
         "/World/target",
-        position=np.array([0.5, 0, 0.5]),
+        position=np.array([0.5, 0, 0.75]),
         orientation=np.array([0, 1, 0, 0]),
         color=np.array([1.0, 0, 0]),
         size=0.05,
@@ -159,7 +159,7 @@ def main():
     trim_steps = None
     max_attempts = 4
     interpolation_dt = 0.05
-    enable_finetune_trajopt = True
+    enable_finetune_trajopt = False
     if args.reactive:
         trajopt_tsteps = 40
         trajopt_dt = 0.04
@@ -258,7 +258,7 @@ def main():
         if step_index < 20:
             continue
 
-        if step_index == 50 or step_index % 1000 == 0.0:
+        if step_index == 50 or step_index % 100 == 0.0:
             print("Updating world, reading w.r.t.", robot_prim_path)
             obstacles = usd_help.get_obstacles_from_stage(
                 # only_paths=[obstacles_path],
@@ -273,7 +273,7 @@ def main():
             print(len(obstacles.objects))
 
             motion_gen.update_world(obstacles)
-            print("Updated World")
+            # print("Updated World")
             carb.log_info("Synced CuRobo world from stage.")
 
         # position and orientation of target virtual cube:
@@ -345,10 +345,8 @@ def main():
         if (
             (
                 np.linalg.norm(cube_position - target_pose) > 1e-3
-                or np.linalg.norm(cube_orientation - target_orientation) > 1e-3
             )
             and np.linalg.norm(past_pose - cube_position) == 0.0
-            and np.linalg.norm(past_orientation - cube_orientation) == 0.0
             and robot_static
         ):
             print("start replan!!!!!!!!!!!!!!!!!!!!!!!!!!!")
@@ -382,11 +380,13 @@ def main():
                 cmd_plan = cmd_plan.get_ordered_joint_state(common_js_names)
 
                 cmd_idx = 0
-
+                
+                # only update pose when planned successfully 
+                target_pose = cube_position
+                target_orientation = cube_orientation
             else:
                 carb.log_warn("Plan did not converge to a solution: " + str(result.status))
-            target_pose = cube_position
-            target_orientation = cube_orientation
+
         past_pose = cube_position
         past_orientation = cube_orientation
         if cmd_plan is not None:

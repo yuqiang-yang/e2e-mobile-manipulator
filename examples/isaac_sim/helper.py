@@ -207,6 +207,8 @@ def calculate_position_offset(step, amplitude, angle, period):
     return dx, dy, dz
 
 def add_random_objects(my_world, num_cylinders=5, num_spheres=5, dynamic=True):
+    
+    random.seed(2)
     stage = my_world.stage
 
     # Function to create a cylinder

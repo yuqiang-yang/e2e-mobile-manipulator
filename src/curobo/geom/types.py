@@ -361,7 +361,7 @@ class Sphere(Obstacle):
         """Post initialization checks if position was set, logs warning to use pose instead."""
         if self.position is not None:
             self.pose = self.position + [1, 0, 0, 0]
-            log_warn("Sphere.position is deprecated, use Sphere.pose instead")
+            # log_warn("Sphere.position is deprecated, use Sphere.pose instead")
         if self.pose is not None:
             self.position = self.pose[:3]
 
