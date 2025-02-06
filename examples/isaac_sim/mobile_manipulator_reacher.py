@@ -322,7 +322,7 @@ def main():
         if (np.max(np.abs(sim_js.velocities)) < 0.6) or args.reactive:
             robot_static = True
         
-        print(f"static : {robot_static}  cube_position: {cube_position}  target_pose: {target_pose} past_pose:{past_pose}")
+        # print(f"static : {robot_static}  cube_position: {cube_position}  target_pose: {target_pose} past_pose:{past_pose}")
         if (
             (
                 np.linalg.norm(cube_position - target_pose) > 1e-3
@@ -332,6 +332,7 @@ def main():
             and np.linalg.norm(past_orientation - cube_orientation) == 0.0
             and robot_static
         ):
+            print("start replan!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             # Set EE teleop goals, use cube for simple non-vr init:
             ee_translation_goal = cube_position
             ee_orientation_teleop_goal = cube_orientation
@@ -379,10 +380,13 @@ def main():
                 joint_indices=idx_list,
             )
             # set desired joint angles obtained from IK:
+            articulation_controller.set_gains(60000, 100)
             articulation_controller.apply_action(art_action)
+            # import ipdb; ipdb.set_trace()
             cmd_idx += 1
             for _ in range(2):
                 my_world.step(render=False)
+            print(f"cmd idx:{cmd_idx}/{len(cmd_plan.position)} pos:{cmd_state.position.cpu().numpy()} vel:{cmd_state.velocity.cpu().numpy()}")
             if cmd_idx >= len(cmd_plan.position):
                 cmd_idx = 0
                 cmd_plan = None

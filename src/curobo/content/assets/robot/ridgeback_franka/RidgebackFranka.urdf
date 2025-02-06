@@ -9,6 +9,7 @@
     <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
     <parent link="Root"/>
     <child link="dummy_base_x"/>
+    <dynamics damping="10.0"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-600.2800293" upper="600.2800293" effort="4800." velocity="15."/>
   </joint>
@@ -16,6 +17,7 @@
     <origin xyz="0. 0. 0." rpy="0. 0. 1.5707964"/>
     <parent link="dummy_base_x"/>
     <child link="dummy_base_y"/>
+    <dynamics damping="10.0"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-600.2800293" upper="600.2800293" effort="4800." velocity="15."/>
   </joint>
@@ -23,6 +25,7 @@
     <origin xyz="0. 0. 0." rpy="-1.5707964 -1.5707964 0. "/>
     <parent link="dummy_base_y"/>
     <child link="base_link"/>
+    <dynamics damping="10.0"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-600.2800208" upper="600.2800208" effort="4800." velocity="15.0000002"/>
   </joint>
@@ -401,7 +404,7 @@
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="165.3040009"/>
-      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+      <inertia ixx="0.1" ixy="0." ixz="0." iyy="0.1" iyz="0." izz="0.1"/>
     </inertial>
     <visual>
       <origin xyz="0. 0. 0." rpy="0. 1.5707964 0. "/>
@@ -479,15 +482,15 @@
   <link name="dummy_base_x">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
-      <mass value="0.0001"/>
-      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+      <mass value="0.1"/>
+      <inertia ixx="0.1" ixy="0." ixz="0." iyy="0.1" iyz="0." izz="0.1"/>
     </inertial>
   </link>
   <link name="dummy_base_y">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
-      <mass value="0.0001"/>
-      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+      <mass value="0.1"/>
+      <inertia ixx="0.1" ixy="0." ixz="0." iyy="0.1" iyz="0." izz="0.1"/>
     </inertial>
   </link>
   <link name="endeffector">
