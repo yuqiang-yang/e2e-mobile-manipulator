@@ -10,14 +10,14 @@
 ##
 collision_spheres:
     Root:
-        - "center": [0.23, -0.23, 0.2]
-          "radius": 0.25
-        - "center": [0.23, 0.23, 0.2]
-          "radius": 0.25
-        - "center": [-0.23, -0.23, 0.2]
-          "radius": 0.25
-        - "center": [-0.23, 0.23, 0.2]
-          "radius": 0.25
+        - "center": [0.23, -0.23, 0.25]
+          "radius": 0.23
+        - "center": [0.23, 0.23, 0.25]
+          "radius": 0.23
+        - "center": [-0.23, -0.23, 0.25]
+          "radius": 0.23
+        - "center": [-0.23, 0.23, 0.25]
+          "radius": 0.23
     RidgebackFranka_panda_link0:
         - "center": [0.0, 0.0, 0.0]
           "radius": 0.07

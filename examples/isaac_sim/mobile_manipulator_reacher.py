@@ -319,10 +319,10 @@ def main():
                         spheres[si].set_radius(float(s.radius))
 
         robot_static = False
-        if (np.max(np.abs(sim_js.velocities)) < 0.2) or args.reactive:
+        if (np.max(np.abs(sim_js.velocities)) < 0.6) or args.reactive:
             robot_static = True
         
-        # print(f"static : {robot_static}  cube_position: {cube_position}  target_pose: {target_pose} past_pose:{past_pose}")
+        print(f"static : {robot_static}  cube_position: {cube_position}  target_pose: {target_pose} past_pose:{past_pose}")
         if (
             (
                 np.linalg.norm(cube_position - target_pose) > 1e-3
