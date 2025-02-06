@@ -9,7 +9,7 @@ parser.add_argument(
     default=None,
     help="To run headless, use one of [native, websocket], webrtc might not work.",
 )
-parser.add_argument("--robot", type=str, default="franka.yml", help="robot configuration to load")
+parser.add_argument("--robot", type=str, default="ridgeback_franka.yml", help="robot configuration to load")
 parser.add_argument(
     "--external_asset_path",
     type=str,
@@ -167,6 +167,8 @@ def main():
         trim_steps = [1, None]
         interpolation_dt = trajopt_dt
         enable_finetune_trajopt = False
+        
+    # motion_gen_config = MotionGenConfig.load_from_robot_config(robot_cfg, world_cfg, tensor_args, collision_checker_type=CollisionCheckerType.MESH, num_trajopt_seeds=12, num_graph_seeds=12, interpolation_dt=interpolation_dt, collision_cache={"obb": n_obstacle_cuboids, "mesh": n_obstacle_mesh}, optimize_dt=optimize_dt, trajopt_dt=trajopt_dt, trajopt_tsteps=trajopt_tsteps, trim_steps=trim_steps)        
     motion_gen_config = MotionGenConfig.load_from_robot_config(
         robot_cfg,
         world_cfg,
@@ -269,6 +271,9 @@ def main():
 
         sim_js = robot.get_joints_state()
         sim_js_names = robot.dof_names
+        # print(f"sim_js_position: {sim_js.positions}")
+        # print(f"sim_js_vel: {sim_js.velocities}")
+        # print(f"sim_js_names: {sim_js_names}")
         if np.any(np.isnan(sim_js.positions)):
             log_error("isaac sim has returned NAN joint position values.")
         cu_js = JointState(
@@ -289,9 +294,12 @@ def main():
             cu_js.acceleration[:] = past_cmd.acceleration
         cu_js = cu_js.get_ordered_joint_state(motion_gen.kinematics.joint_names)
 
-        if args.visualize_spheres and step_index % 2 == 0:
-            sph_list = motion_gen.kinematics.get_robot_as_spheres(cu_js.position)
 
+        if args.visualize_spheres and step_index % 2 == 0:
+            
+            sph_list = motion_gen.kinematics.get_robot_as_spheres(cu_js.position)
+            # import ipdb; ipdb.set_trace()
+            print(cu_js.position)
             if spheres is None:
                 spheres = []
                 # create spheres:
@@ -313,6 +321,8 @@ def main():
         robot_static = False
         if (np.max(np.abs(sim_js.velocities)) < 0.2) or args.reactive:
             robot_static = True
+        
+        # print(f"static : {robot_static}  cube_position: {cube_position}  target_pose: {target_pose} past_pose:{past_pose}")
         if (
             (
                 np.linalg.norm(cube_position - target_pose) > 1e-3
@@ -334,7 +344,6 @@ def main():
             plan_config.pose_cost_metric = pose_metric
             result = motion_gen.plan_single(cu_js.unsqueeze(0), ik_goal, plan_config)
             # ik_result = ik_solver.solve_single(ik_goal, cu_js.position.view(1,-1), cu_js.position.view(1,1,-1))
-
             succ = result.success.item()  # ik_result.success.item()
 
             if succ:
