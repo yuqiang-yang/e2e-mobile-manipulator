@@ -36,7 +36,7 @@ robot_cfg:
     # link_names: null
     collision_link_names:
       [
-        "Root",
+        "base_link",
         "RidgebackFranka_panda_link0",
         "RidgebackFranka_panda_link1",
         "RidgebackFranka_panda_link2",
@@ -55,12 +55,12 @@ robot_cfg:
     self_collision_ignore:
       {
         "base_link": ["RidgebackFranka_panda_link0", "RidgebackFranka_panda_link1", "RidgebackFranka_panda_link2", "RidgebackFranka_panda_link3", "RidgebackFranka_panda_link4"],
-        "RidgebackFranka_panda_link0": ["RidgebackFranka_panda_link1", "RidgebackFranka_panda_link2", "Root"],
-        "RidgebackFranka_panda_link1": ["RidgebackFranka_panda_link2", "RidgebackFranka_panda_link3", "RidgebackFranka_panda_link4", "Root"],
-        "RidgebackFranka_panda_link2": ["RidgebackFranka_panda_link3", "RidgebackFranka_panda_link4", "Root"],
-        "RidgebackFranka_panda_link3": ["RidgebackFranka_panda_link4", "RidgebackFranka_panda_link6", "Root"],
+        "RidgebackFranka_panda_link0": ["RidgebackFranka_panda_link1", "RidgebackFranka_panda_link2", "base_link"],
+        "RidgebackFranka_panda_link1": ["RidgebackFranka_panda_link2", "RidgebackFranka_panda_link3", "RidgebackFranka_panda_link4", "base_link"],
+        "RidgebackFranka_panda_link2": ["RidgebackFranka_panda_link3", "RidgebackFranka_panda_link4", "base_link"],
+        "RidgebackFranka_panda_link3": ["RidgebackFranka_panda_link4", "RidgebackFranka_panda_link6", "base_link"],
         "RidgebackFranka_panda_link4":
-          ["RidgebackFranka_panda_link5", "RidgebackFranka_panda_link6", "RidgebackFranka_panda_link7", "RidgebackFranka_panda_link8", "Root"],
+          ["RidgebackFranka_panda_link5", "RidgebackFranka_panda_link6", "RidgebackFranka_panda_link7", "RidgebackFranka_panda_link8", "base_link"],
         "RidgebackFranka_panda_link5": ["RidgebackFranka_panda_link6", "RidgebackFranka_panda_link7", "RidgebackFranka_panda_hand","RidgebackFranka_panda_leftfinger", "RidgebackFranka_panda_rightfinger", "base_link"],
         "RidgebackFranka_panda_link6": ["RidgebackFranka_panda_link7", "RidgebackFranka_panda_hand",  "RidgebackFranka_panda_leftfinger", "RidgebackFranka_panda_rightfinger"],
         "RidgebackFranka_panda_link7": ["RidgebackFranka_panda_hand", "RidgebackFranka_panda_leftfinger", "RidgebackFranka_panda_rightfinger"],

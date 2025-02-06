@@ -14,15 +14,15 @@ collision_spheres:
           "radius": 0.2
         - "center": [0.2, 0.2, 0.2]
           "radius": 0.2
-        - "center": [-0.2, 0.2, 0.2]
+        - "center": [0.0, -0.2, 0.2]
           "radius": 0.2
-        - "center": [-0.2, -0.2, 0.2]
+        - "center": [0.0, 0.2, 0.2]
           "radius": 0.2
     RidgebackFranka_panda_link0:
         - "center": [0.0, 0.0, 0.085]
-          "radius": 0.00 #0.07
+          "radius": 0.03 #0.07
         - "center": [-0.1, -0.0, 0.085]
-          "radius": 0.00 #0.07
+          "radius": 0.03 #0.07
     RidgebackFranka_panda_link1:
         - "center": [0.0, -0.08, 0.0]
           "radius": 0.055

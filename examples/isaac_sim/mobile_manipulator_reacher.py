@@ -194,7 +194,7 @@ def main():
     add_extensions(simulation_app, args.headless_mode)
 
     plan_config = MotionGenPlanConfig(
-        enable_graph=False,
+        enable_graph=True,
         enable_graph_attempt=2,
         max_attempts=max_attempts,
         enable_finetune_trajopt=enable_finetune_trajopt,

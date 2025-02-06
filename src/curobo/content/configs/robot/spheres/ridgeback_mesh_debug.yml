@@ -9,15 +9,57 @@
 ## its affiliates is strictly prohibited.
 ##
 collision_spheres:
-    Root:
-        - "center": [0.23, -0.23, 0.25]
-          "radius": 0.23
-        - "center": [0.23, 0.23, 0.25]
-          "radius": 0.23
-        - "center": [-0.23, -0.23, 0.25]
-          "radius": 0.23
-        - "center": [-0.23, 0.23, 0.25]
-          "radius": 0.23
+    base_link:
+        - "center": [0.2, 0.4, 0.4]
+          "radius": 0.15
+        - "center": [0.2, 0.4, 0.2]
+          "radius": 0.15
+        - "center": [0.2, 0.4, 0.0]
+          "radius": 0.15        
+        - "center": [0.2, 0.4, -0.2]
+          "radius": 0.15   
+        - "center": [0.2, 0.4, -0.4]
+          "radius": 0.15   
+        - "center": [0.2, 0.2, 0.4]
+          "radius": 0.15
+        - "center": [0.2, 0.2, 0.2]
+          "radius": 0.15
+        - "center": [0.2, 0.2, 0.0]
+          "radius": 0.15        
+        - "center": [0.2, 0.2, -0.2]
+          "radius": 0.15   
+        - "center": [0.2, 0.2, -0.4]
+          "radius": 0.15  
+        - "center": [0.2, 0.0, 0.4]
+          "radius": 0.15
+        - "center": [0.2, 0.0, 0.2]
+          "radius": 0.15
+        - "center": [0.2, 0.0, 0.0]
+          "radius": 0.15        
+        - "center": [0.2, 0.0, -0.2]
+          "radius": 0.15   
+        - "center": [0.2, 0.0, -0.4]
+          "radius": 0.15    
+        - "center": [0.2, -0.2, 0.4]
+          "radius": 0.15
+        - "center": [0.2, -0.2, 0.2]
+          "radius": 0.15
+        - "center": [0.2, -0.2, 0.0]
+          "radius": 0.15        
+        - "center": [0.2, -0.2, -0.2]
+          "radius": 0.15   
+        - "center": [0.2, -0.2, -0.4]
+          "radius": 0.15   
+        - "center": [0.2, -0.4, 0.4]
+          "radius": 0.15
+        - "center": [0.2, -0.4, 0.2]
+          "radius": 0.15
+        - "center": [0.2, -0.4, 0.0]
+          "radius": 0.15        
+        - "center": [0.2, -0.4, -0.2]
+          "radius": 0.15   
+        - "center": [0.2, -0.4, -0.4]
+          "radius": 0.15   
     RidgebackFranka_panda_link0:
         - "center": [0.0, 0.0, 0.0]
           "radius": 0.07

@@ -168,7 +168,7 @@ class MotionGenConfig:
         robot_cfg: Union[Union[str, Dict], RobotConfig],
         world_model: Optional[Union[Union[str, Dict], WorldConfig]] = None,
         tensor_args: TensorDeviceType = TensorDeviceType(),
-        num_ik_seeds: int = 32,
+        num_ik_seeds: int = 128,
         num_graph_seeds: int = 4,
         num_trajopt_seeds: int = 4,
         num_batch_ik_seeds: int = 32,
