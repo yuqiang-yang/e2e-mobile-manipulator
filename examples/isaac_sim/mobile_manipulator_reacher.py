@@ -363,7 +363,8 @@ def main():
             result = motion_gen.plan_single(cu_js.unsqueeze(0), ik_goal, plan_config)
             # ik_result = ik_solver.solve_single(ik_goal, cu_js.position.view(1,-1), cu_js.position.view(1,1,-1))
             succ = result.success.item()  # ik_result.success.item()
-
+            print(f"result ik time:{result.ik_time} graph time:{result.graph_time} \
+                opt_time:{result.trajopt_time} finetune:{result.finetune_time} total:{result.total_time}")
             if succ:
                 num_targets += 1
                 cmd_plan = result.get_interpolated_plan()
