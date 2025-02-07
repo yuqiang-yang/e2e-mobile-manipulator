@@ -206,7 +206,7 @@ def calculate_position_offset(step, amplitude, angle, period):
     dz = 0  
     return dx, dy, dz
 
-def add_random_objects(my_world, num_cylinders=5, num_spheres=5, dynamic=True):
+def add_random_objects(my_world, num_cylinders=5, num_spheres=5, obs_range = 5,dynamic=True):
     
     random.seed(2)
     stage = my_world.stage
@@ -235,8 +235,8 @@ def add_random_objects(my_world, num_cylinders=5, num_spheres=5, dynamic=True):
 
     # Add random cylinders
     for i in range(num_cylinders):
-        x = random.uniform(-5, 5)
-        y = random.uniform(-5, 5)
+        x = random.uniform(-obs_range, obs_range)
+        y = random.uniform(-obs_range, obs_range)
         z = random.uniform(0, 0.5)
         if np.linalg.norm([x, y]) < 1.0:
             continue
@@ -252,8 +252,8 @@ def add_random_objects(my_world, num_cylinders=5, num_spheres=5, dynamic=True):
 
     # Add random spheres
     for i in range(num_spheres):
-        x = random.uniform(-5, 5)
-        y = random.uniform(-5, 5)
+        x = random.uniform(-obs_range, obs_range)
+        y = random.uniform(-obs_range, obs_range)
         z = random.uniform(1, 3)  # Suspended in the air
         if np.linalg.norm([x, y]) < 1.0:
             continue

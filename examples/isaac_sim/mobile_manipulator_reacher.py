@@ -117,7 +117,7 @@ def main():
     
     setup_curobo_logger("warn")
     past_pose = None
-    n_obstacle_cuboids = 30
+    n_obstacle_cuboids = 200
     n_obstacle_mesh = 100
 
     # warmup curobo instance
@@ -141,17 +141,7 @@ def main():
 
     articulation_controller = None
 
-    world_cfg_table = WorldConfig.from_dict(
-        load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
-    )
-    world_cfg_table.cuboid[0].pose[2] -= 0.02
-    world_cfg1 = WorldConfig.from_dict(
-        load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
-    ).get_mesh_world()
-    world_cfg1.mesh[0].name += "_mesh"
-    world_cfg1.mesh[0].pose[2] = -10.5
-
-    world_cfg = WorldConfig(cuboid=world_cfg_table.cuboid, mesh=world_cfg1.mesh)
+    world_cfg = WorldConfig()
 
     trajopt_dt = None
     optimize_dt = True
@@ -220,7 +210,7 @@ def main():
     # switches to camera lighting
     action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_camera")
     action.execute()
-    prims_with_trajectories = add_random_objects(my_world, 20, 20, dynamic=False)
+    prims_with_trajectories = add_random_objects(my_world, 50, 50, obs_range=10, dynamic=False)
     ##### Isaac custom config #######
     
     while simulation_app.is_running():
@@ -271,10 +261,10 @@ def main():
                 ],
             ).get_collision_check_world()
 
-
+            pt1 = time.time()
             motion_gen.update_world(obstacles)
             # print("Updated World")
-            print(f"Updating world, obj num:{len(obstacles.objects)} cost {time.time() - start}")
+            print(f"Updating world, obj num:{len(obstacles.objects)} load time:{pt1 - start} total_time {time.time() - start}")
 
         # position and orientation of target virtual cube:
         cube_position, cube_orientation = target.get_world_pose()
