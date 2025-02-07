@@ -194,7 +194,7 @@ def main():
     add_extensions(simulation_app, args.headless_mode)
 
     plan_config = MotionGenPlanConfig(
-        enable_graph=True,
+        enable_graph=False,
         enable_graph_attempt=2,
         max_attempts=max_attempts,
         enable_finetune_trajopt=enable_finetune_trajopt,
@@ -349,7 +349,7 @@ def main():
             and np.linalg.norm(past_pose - cube_position) == 0.0
             and robot_static
         ):
-            print("start replan!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            # print("start replan!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             # Set EE teleop goals, use cube for simple non-vr init:
             ee_translation_goal = cube_position
             ee_orientation_teleop_goal = cube_orientation
@@ -363,8 +363,9 @@ def main():
             result = motion_gen.plan_single(cu_js.unsqueeze(0), ik_goal, plan_config)
             # ik_result = ik_solver.solve_single(ik_goal, cu_js.position.view(1,-1), cu_js.position.view(1,1,-1))
             succ = result.success.item()  # ik_result.success.item()
-            print(f"result ik time:{result.ik_time} graph time:{result.graph_time} \
-                opt_time:{result.trajopt_time} finetune:{result.finetune_time} total:{result.total_time}")
+            print(f"result ik time:{result.ik_time:.3f} graph time:{result.graph_time:.3f} " \
+                    f"opt_time:{result.trajopt_time:.3f} finetune:{result.finetune_time:.3f} total:{result.total_time:.3f} " \
+                    f"attemps:{result.attempts} opt_attemps:{result.trajopt_attempts}")
             if succ:
                 num_targets += 1
                 cmd_plan = result.get_interpolated_plan()
