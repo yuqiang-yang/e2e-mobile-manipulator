@@ -195,7 +195,7 @@ class MotionGenConfig:
         grad_trajopt_iters: Optional[int] = None,
         trajopt_seed_ratio: Dict[str, int] = {"linear": 1.0, "bias": 0.0},
         ik_opt_iters: Optional[int] = None,
-        ik_particle_opt: bool = True,
+        ik_particle_opt: bool = False,
         collision_checker_type: Optional[CollisionCheckerType] = CollisionCheckerType.MESH,
         sync_cuda_time: Optional[bool] = None,
         trajopt_particle_opt: bool = True,

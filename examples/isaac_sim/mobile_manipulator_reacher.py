@@ -1,7 +1,7 @@
 import isaacsim
 import torch
 import argparse
-
+import time
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--headless_mode",
@@ -220,7 +220,7 @@ def main():
     # switches to camera lighting
     action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_camera")
     action.execute()
-    prims_with_trajectories = add_random_objects(my_world, 10, 10, dynamic=False)
+    prims_with_trajectories = add_random_objects(my_world, 20, 20, dynamic=False)
     ##### Isaac custom config #######
     
     while simulation_app.is_running():
@@ -259,7 +259,7 @@ def main():
             continue
 
         if step_index == 50 or step_index % 100 == 0.0:
-            print("Updating world, reading w.r.t.", robot_prim_path)
+            start = time.time()
             obstacles = usd_help.get_obstacles_from_stage(
                 # only_paths=[obstacles_path],
                 reference_prim_path=robot_prim_path,
@@ -270,11 +270,11 @@ def main():
                     "/curobo",
                 ],
             ).get_collision_check_world()
-            print(len(obstacles.objects))
+
 
             motion_gen.update_world(obstacles)
             # print("Updated World")
-            carb.log_info("Synced CuRobo world from stage.")
+            print(f"Updating world, obj num:{len(obstacles.objects)} cost {time.time() - start}")
 
         # position and orientation of target virtual cube:
         cube_position, cube_orientation = target.get_world_pose()

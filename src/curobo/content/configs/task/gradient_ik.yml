@@ -28,14 +28,14 @@ model:
 cost:
   pose_cfg:
     vec_weight: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-    weight: [2000,10000,20,40]
+    weight: [0.2,1,20,40]
     vec_convergence: [0.0, 0.00]
     terminal: False
     use_metric: True
     run_weight: 1.0
   link_pose_cfg:
     vec_weight: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-    weight: [2000,10000,20,40]
+    weight: [2,10,20,40]
     vec_convergence: [0.00, 0.000]
     terminal: False
     use_metric: True

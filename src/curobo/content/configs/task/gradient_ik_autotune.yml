@@ -53,10 +53,10 @@ cost:
     - 1.0
     - 1.0
     weight:
-    - 51057.936375400066
-    - 843196.9018921662
-    - 57.65743420107279
-    - 27.3008552454367
+    - 1 #5
+    - 1 #80
+    - 1 #50
+    - 1 #27
   primitive_collision_cfg:
     activation_distance: 0.01
     classify: false
