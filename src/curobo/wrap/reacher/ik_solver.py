@@ -145,7 +145,7 @@ class IKSolverConfig:
         es_learning_rate: Optional[float] = 0.1,
         use_fixed_samples: Optional[bool] = None,
         store_debug: bool = False,
-        regularization: bool = False,
+        regularization: bool = True,
         collision_activation_distance: Optional[float] = None,
         high_precision: bool = False,
         project_pose_to_goal_frame: bool = True,
