@@ -93,6 +93,7 @@ from curobo.wrap.reacher.motion_gen import (
 
 
 def main():
+    NUM_ROBOTS = 4
     # create a curobo motion gen instance:
     num_targets = 0
     # assuming obstacles are in objects_path:
@@ -114,7 +115,7 @@ def main():
         color=np.array([1.0, 0, 0]),
         size=0.05,
     )
-    
+
     setup_curobo_logger("warn")
     past_pose = None
     n_obstacle_cuboids = 200
@@ -137,11 +138,9 @@ def main():
     j_names = robot_cfg["kinematics"]["cspace"]["joint_names"]
     default_config = robot_cfg["kinematics"]["cspace"]["retract_config"]
 
-    robots, robot_prim_paths = add_multiple_robots(4, robot_cfg, my_world, subroot="/Robot",\
-        positions=np.array([(1.5 * i, 0, 0) for i in range(4)]))
+    robots, robot_prim_paths = add_multiple_robots(NUM_ROBOTS, robot_cfg, my_world, subroot="/Robot",\
+        positions=np.array([(0.0 * i, 0, 0) for i in range(NUM_ROBOTS)]))
     robot, robot_prim_path = robots[0], robot_prim_paths[0]
-    # robot, robot_prim_path = add_robot_to_scene(robot_cfg, my_world)
-
 
     world_cfg = WorldConfig()
 
@@ -160,8 +159,8 @@ def main():
         trim_steps = [1, None]
         interpolation_dt = trajopt_dt
         enable_finetune_trajopt = False
-        
-    # motion_gen_config = MotionGenConfig.load_from_robot_config(robot_cfg, world_cfg, tensor_args, collision_checker_type=CollisionCheckerType.MESH, num_trajopt_seeds=12, num_graph_seeds=12, interpolation_dt=interpolation_dt, collision_cache={"obb": n_obstacle_cuboids, "mesh": n_obstacle_mesh}, optimize_dt=optimize_dt, trajopt_dt=trajopt_dt, trajopt_tsteps=trajopt_tsteps, trim_steps=trim_steps)        
+
+    # motion_gen_config = MotionGenConfig.load_from_robot_config(robot_cfg, world_cfg, tensor_args, collision_checker_type=CollisionCheckerType.MESH, num_trajopt_seeds=12, num_graph_seeds=12, interpolation_dt=interpolation_dt, collision_cache={"obb": n_obstacle_cuboids, "mesh": n_obstacle_mesh}, optimize_dt=optimize_dt, trajopt_dt=trajopt_dt, trajopt_tsteps=trajopt_tsteps, trim_steps=trim_steps)
     motion_gen_config = MotionGenConfig.load_from_robot_config(
         robot_cfg,
         world_cfg,
@@ -179,7 +178,7 @@ def main():
     motion_gen = MotionGen(motion_gen_config)
     if not args.reactive:
         print("warming up...")
-        motion_gen.warmup(enable_graph=True, warmup_js_trajopt=False)
+        motion_gen.warmup(enable_graph=True, warmup_js_trajopt=False, batch=NUM_ROBOTS)
 
     print("Curobo is Ready")
 
@@ -190,7 +189,6 @@ def main():
         enable_graph_attempt=2,
         max_attempts=max_attempts,
         enable_finetune_trajopt=enable_finetune_trajopt,
-        time_dilation_factor=0.5 if not args.reactive else 1.0,
     )
 
     usd_help.load_stage(my_world.stage)
@@ -214,7 +212,7 @@ def main():
     action.execute()
     prims_with_trajectories = add_random_objects(my_world, 50, 50, obs_range=10, dynamic=False)
     ##### Isaac custom config #######
-    
+
     while simulation_app.is_running():
         my_world.step(render=True)
         if not my_world.is_playing():
@@ -226,7 +224,7 @@ def main():
             continue
 
         step_index = my_world.current_time_step_index
-        
+
         for prim, initial_position, amplitude, angle, period in prims_with_trajectories:
             dx, dy, dz = calculate_position_offset(step_index, amplitude, angle, period)
             new_x = initial_position[0] + dx
@@ -279,9 +277,7 @@ def main():
 
         sim_js = robot.get_joints_state()
         sim_js_names = robot.dof_names
-        # print(f"sim_js_position: {sim_js.positions}")
-        # print(f"sim_js_vel: {sim_js.velocities}")
-        # print(f"sim_js_names: {sim_js_names}")
+
         if np.any(np.isnan(sim_js.positions)):
             log_error("isaac sim has returned NAN joint position values.")
         cu_js = JointState(
@@ -302,9 +298,8 @@ def main():
             cu_js.acceleration[:] = past_cmd.acceleration
         cu_js = cu_js.get_ordered_joint_state(motion_gen.kinematics.joint_names)
 
-
         if args.visualize_spheres and step_index % 2 == 0:
-            
+
             sph_list = motion_gen.kinematics.get_robot_as_spheres(cu_js.position)
             # import ipdb; ipdb.set_trace()
             print(cu_js.position)
@@ -329,7 +324,7 @@ def main():
         # robot_static = False
         # if (np.max(np.abs(sim_js.velocities)) < 0.6) or args.reactive:
         robot_static = True
-        
+
         # print(f"static : {robot_static}  cube_position: {cube_position}  target_pose: {target_pose} past_pose:{past_pose}")
         if (
             (
@@ -349,15 +344,20 @@ def main():
                 quaternion=tensor_args.to_device(ee_orientation_teleop_goal),
             )
             plan_config.pose_cost_metric = pose_metric
-            result = motion_gen.plan_single(cu_js.unsqueeze(0), ik_goal, plan_config)
-            # ik_result = ik_solver.solve_single(ik_goal, cu_js.position.view(1,-1), cu_js.position.view(1,1,-1))
-            succ = result.success.item()  # ik_result.success.item()
+            result = motion_gen.plan_batch(
+                cu_js.unsqueeze(0).repeat_seeds(NUM_ROBOTS),
+                ik_goal.repeat_seeds(NUM_ROBOTS),
+                plan_config,
+            )
+            # import ipdb; ipdb.set_trace()
+            succ = result.success[0].item()  # ik_result.success.item()
             print(f"result ik time:{result.ik_time:.3f} graph time:{result.graph_time:.3f} " \
                     f"opt_time:{result.trajopt_time:.3f} finetune:{result.finetune_time:.3f} total:{result.total_time:.3f} " \
                     f"attemps:{result.attempts} opt_attemps:{result.trajopt_attempts}")
             if succ:
                 num_targets += 1
-                cmd_plan = result.get_interpolated_plan()
+                # cmd_plan = result.get_interpolated_plan()
+                cmd_plan = result.optimized_plan[0]
                 cmd_plan = motion_gen.get_full_js(cmd_plan)
                 # get only joint names that are in both:
                 idx_list = []
@@ -366,32 +366,28 @@ def main():
                     if x in cmd_plan.joint_names:
                         idx_list.append(robot.get_dof_index(x))
                         common_js_names.append(x)
-                # idx_list = [robot.get_dof_index(x) for x in sim_js_names]
 
                 cmd_plan = cmd_plan.get_ordered_joint_state(common_js_names)
 
                 cmd_idx = 0
-                
-                # only update pose when planned successfully 
+
+                # only update pose when planned successfully
                 target_pose = cube_position
                 target_orientation = cube_orientation
             else:
                 carb.log_warn("Plan did not converge to a solution: " + str(result.status))
 
+        
         past_pose = cube_position
         past_orientation = cube_orientation
         if cmd_plan is not None:
             cmd_state = cmd_plan[cmd_idx]
             past_cmd = cmd_state.clone()
-            # get full dof state
-            art_action = ArticulationAction(
-                cmd_state.position.cpu().numpy(),
-                cmd_state.velocity.cpu().numpy(),
-                joint_indices=idx_list,
-            )
+
             robot.set_joint_positions(cmd_state.position.cpu().numpy())
-  
-            cmd_idx += 1
+            
+            if step_index % 2 == 0:
+                cmd_idx += 1
             for _ in range(2):
                 my_world.step(render=False)
             # print(f"cmd idx:{cmd_idx}/{len(cmd_plan.position)} pos:{cmd_state.position.cpu().numpy()} vel:{cmd_state.velocity.cpu().numpy()}")
