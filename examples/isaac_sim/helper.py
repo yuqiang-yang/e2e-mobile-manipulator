@@ -105,7 +105,6 @@ def add_robot_to_scene(
     )
 
     base_link_name = robot_config["kinematics"]["base_link"]
-
     robot_p = Robot(
         prim_path=robot_path + "/" + base_link_name,
         name=robot_name,
@@ -118,6 +117,52 @@ def add_robot_to_scene(
 
     robot = my_world.scene.add(robot_p)
     return robot, robot_path
+
+
+def add_multiple_robots(
+    num_robots: int,
+    robot_config: Dict,
+    my_world: World,
+    subroot: str = "",
+    positions: np.ndarray = None
+):
+    if positions is None:
+        positions = np.zeros((num_robots, 3))
+
+    robots = []
+    robot_paths = []
+
+    stage = my_world.stage
+    if not stage.GetPrimAtPath(Sdf.Path(subroot)).IsValid():
+        stage.DefinePrim(Sdf.Path(subroot))
+        
+    def remove_collision_named_prims(prim):
+        # prim_name = prim.GetName()
+        # if prim_name == "collisions":
+        #     stage.RemovePrim(prim.GetPath())
+        #     return
+        if UsdPhysics.CollisionAPI(prim):
+            print(f"hit {prim.GetName()}")
+            stage.RemovePrim(prim.GetPath())
+            return
+        for child_prim in prim.GetChildren():
+            remove_collision_named_prims(child_prim)
+
+    for i in range(num_robots):
+        robot_name = f"robot_{i}"
+        position = positions[i]
+        robot, robot_path = add_robot_to_scene(
+            robot_config,
+            my_world,
+            subroot=subroot,
+            robot_name=robot_name,
+            position=position
+            )
+        robots.append(robot)
+        robot_paths.append(robot_path)
+
+        remove_collision_named_prims(stage.GetPrimAtPath(robot_path))    
+    return robots, robot_paths
 
 
 class VoxelManager:

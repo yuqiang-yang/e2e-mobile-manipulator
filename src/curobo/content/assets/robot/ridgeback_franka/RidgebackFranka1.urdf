@@ -9,22 +9,25 @@
     <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
     <parent link="Root"/>
     <child link="dummy_base_x"/>
+    <dynamics damping="10.0"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-600.2800293" upper="600.2800293" effort="4800." velocity="15."/>
+    <limit lower="-100.2800293" upper="100.2800293" effort="4800." velocity="15."/>
   </joint>
   <joint name="dummy_base_prismatic_y_joint" type="prismatic">
     <origin xyz="0. 0. 0." rpy="0. 0. 1.5707964"/>
     <parent link="dummy_base_x"/>
     <child link="dummy_base_y"/>
+    <dynamics damping="10.0"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-600.2800293" upper="600.2800293" effort="4800." velocity="15."/>
+    <limit lower="-100.2800293" upper="100.2800293" effort="4800." velocity="15."/>
   </joint>
   <joint name="dummy_base_revolute_z_joint" type="revolute">
     <origin xyz="0. 0. 0." rpy="-1.5707964 -1.5707964 0. "/>
     <parent link="dummy_base_y"/>
     <child link="base_link"/>
+    <dynamics damping="10.0"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-600.2800208" upper="600.2800208" effort="4800." velocity="15.0000002"/>
+    <limit lower="-100.2800208" upper="100.2800208" effort="4800." velocity="15.0000002"/>
   </joint>
   <joint name="front_laser_joint" type="fixed">
     <origin xyz="0.233 0. -0.3932" rpy="0. 1.5707964 0. "/>
@@ -260,7 +263,7 @@
     <collision>
       <origin xyz="0. 0. 0." rpy="0. 1.5707964 0. "/>
       <geometry>
-        <mesh filename="meshes/RidgebackFranka_panda_link3_collisions.obj" scale="1. 1. 1."/>
+        <box size="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -282,12 +285,6 @@
         <mesh filename="meshes/RidgebackFranka_panda_link4_visuals_panda_link4.obj" scale="0.01 0.01 0.01"/>
       </geometry>
     </visual>
-    <collision>
-      <origin xyz="0. 0. 0." rpy="0. 1.5707964 0. "/>
-      <geometry>
-        <mesh filename="meshes/RidgebackFranka_panda_link4_collisions.obj" scale="1. 1. 1."/>
-      </geometry>
-    </collision>
   </link>
   <link name="RidgebackFranka_panda_link5">
     <inertial>
@@ -307,12 +304,6 @@
         <mesh filename="meshes/RidgebackFranka_panda_link5_visuals_panda_link5.obj" scale="0.01 0.01 0.01"/>
       </geometry>
     </visual>
-    <collision>
-      <origin xyz="0. 0. 0." rpy="0. 1.5707964 0. "/>
-      <geometry>
-        <mesh filename="meshes/RidgebackFranka_panda_link5_collisions.obj" scale="1. 1. 1."/>
-      </geometry>
-    </collision>
   </link>
   <link name="RidgebackFranka_panda_link6">
     <inertial>
@@ -332,12 +323,6 @@
         <mesh filename="meshes/RidgebackFranka_panda_link6_visuals_panda_link6.obj" scale="0.01 0.01 0.01"/>
       </geometry>
     </visual>
-    <collision>
-      <origin xyz="0. 0. 0." rpy="0. 1.5707964 0. "/>
-      <geometry>
-        <mesh filename="meshes/RidgebackFranka_panda_link6_collisions.obj" scale="1. 1. 1."/>
-      </geometry>
-    </collision>
   </link>
   <link name="RidgebackFranka_panda_link7">
     <inertial>
@@ -357,12 +342,6 @@
         <mesh filename="meshes/RidgebackFranka_panda_link7_visuals_panda_link7.obj" scale="0.01 0.01 0.01"/>
       </geometry>
     </visual>
-    <collision>
-      <origin xyz="0. 0. 0." rpy="0. 1.5707964 0. "/>
-      <geometry>
-        <mesh filename="meshes/RidgebackFranka_panda_link7_collisions.obj" scale="1. 1. 1."/>
-      </geometry>
-    </collision>
   </link>
   <link name="RidgebackFranka_panda_rightfinger">
     <inertial>
@@ -382,12 +361,6 @@
         <mesh filename="meshes/RidgebackFranka_panda_rightfinger_visuals_panda_rightfinger.obj" scale="0.01 0.01 0.01"/>
       </geometry>
     </visual>
-    <collision>
-      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707963"/>
-      <geometry>
-        <mesh filename="meshes/RidgebackFranka_panda_rightfinger_collisions.obj" scale="1. 1. 1."/>
-      </geometry>
-    </collision>
   </link>
   <link name="Root"/>
   <link name="arm_mount_link">
@@ -401,7 +374,7 @@
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="165.3040009"/>
-      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+      <inertia ixx="0.1" ixy="0." ixz="0." iyy="0.1" iyz="0." izz="0.1"/>
     </inertial>
     <visual>
       <origin xyz="0. 0. 0." rpy="0. 1.5707964 0. "/>
@@ -479,15 +452,15 @@
   <link name="dummy_base_x">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
-      <mass value="0.0001"/>
-      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+      <mass value="0.1"/>
+      <inertia ixx="0.1" ixy="0." ixz="0." iyy="0.1" iyz="0." izz="0.1"/>
     </inertial>
   </link>
   <link name="dummy_base_y">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
-      <mass value="0.0001"/>
-      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+      <mass value="0.1"/>
+      <inertia ixx="0.1" ixy="0." ixz="0." iyy="0.1" iyz="0." izz="0.1"/>
     </inertial>
   </link>
   <link name="endeffector">

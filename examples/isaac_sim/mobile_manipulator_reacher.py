@@ -137,9 +137,11 @@ def main():
     j_names = robot_cfg["kinematics"]["cspace"]["joint_names"]
     default_config = robot_cfg["kinematics"]["cspace"]["retract_config"]
 
-    robot, robot_prim_path = add_robot_to_scene(robot_cfg, my_world)
+    robots, robot_prim_paths = add_multiple_robots(4, robot_cfg, my_world, subroot="/Robot",\
+        positions=np.array([(1.5 * i, 0, 0) for i in range(4)]))
+    robot, robot_prim_path = robots[0], robot_prim_paths[0]
+    # robot, robot_prim_path = add_robot_to_scene(robot_cfg, my_world)
 
-    articulation_controller = None
 
     world_cfg = WorldConfig()
 
@@ -232,10 +234,6 @@ def main():
             new_z = initial_position[2] + dz
             UsdGeom.XformCommonAPI(prim).SetTranslate((new_x, new_y, new_z))
 
-        # print(step_index)
-        if articulation_controller is None:
-            # robot.initialize()
-            articulation_controller = robot.get_articulation_controller()
         if step_index < 2:
             my_world.reset()
             robot._articulation_view.initialize()
@@ -258,6 +256,7 @@ def main():
                     "/World/target",
                     "/World/defaultGroundPlane",
                     "/curobo",
+                    "/Ridge"
                 ],
             ).get_collision_check_world()
 
@@ -327,9 +326,9 @@ def main():
                         spheres[si].set_world_pose(position=np.ravel(s.position))
                         spheres[si].set_radius(float(s.radius))
 
-        robot_static = False
-        if (np.max(np.abs(sim_js.velocities)) < 0.6) or args.reactive:
-            robot_static = True
+        # robot_static = False
+        # if (np.max(np.abs(sim_js.velocities)) < 0.6) or args.reactive:
+        robot_static = True
         
         # print(f"static : {robot_static}  cube_position: {cube_position}  target_pose: {target_pose} past_pose:{past_pose}")
         if (
@@ -390,10 +389,8 @@ def main():
                 cmd_state.velocity.cpu().numpy(),
                 joint_indices=idx_list,
             )
-            # set desired joint angles obtained from IK:
-            articulation_controller.set_gains(60000, 100)
-            articulation_controller.apply_action(art_action)
-            # import ipdb; ipdb.set_trace()
+            robot.set_joint_positions(cmd_state.position.cpu().numpy())
+  
             cmd_idx += 1
             for _ in range(2):
                 my_world.step(render=False)
