@@ -210,9 +210,10 @@ def main():
     # switches to camera lighting
     action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_camera")
     action.execute()
-    prims_with_trajectories = add_random_objects(my_world, 50, 50, obs_range=10, dynamic=False)
+    prims_with_trajectories = add_random_objects(my_world, 50, 50, obs_range=10, dynamic=True)
     ##### Isaac custom config #######
 
+    obstacles_config = None
     while simulation_app.is_running():
         my_world.step(render=True)
         if not my_world.is_playing():
@@ -225,13 +226,20 @@ def main():
 
         step_index = my_world.current_time_step_index
 
+        if obstacles_config is not None:
+            name2idx = {}
+            for i, mesh in enumerate(obstacles_config.mesh):
+                name2idx[mesh.name] = i
+        # update dynamic obstacle pos
         for prim, initial_position, amplitude, angle, period in prims_with_trajectories:
             dx, dy, dz = calculate_position_offset(step_index, amplitude, angle, period)
             new_x = initial_position[0] + dx
             new_y = initial_position[1] + dy
             new_z = initial_position[2] + dz
             UsdGeom.XformCommonAPI(prim).SetTranslate((new_x, new_y, new_z))
-
+            if obstacles_config is not None:
+                obstacles_config.mesh[name2idx["/World/" + prim.GetName()]].pose = [new_x, new_y, new_z, 1, 0, 0, 0]
+                
         if step_index < 2:
             my_world.reset()
             for robot in robots:
@@ -246,22 +254,23 @@ def main():
 
         if step_index == 50 or step_index % 100 == 0.0:
             start = time.time()
-            obstacles = usd_help.get_obstacles_from_stage(
-                # only_paths=[obstacles_path],
-                reference_prim_path=robot_prim_path,
-                ignore_substring=[
-                    robot_prim_path,
-                    "/World/target",
-                    "/World/defaultGroundPlane",
-                    "/curobo",
-                    "/Ridge"
-                ],
-            ).get_collision_check_world()
-
+            if obstacles_config is None:
+                obstacles_config = usd_help.get_obstacles_from_stage(
+                    # only_paths=[obstacles_path],
+                    reference_prim_path=robot_prim_path,
+                    ignore_substring=[
+                        robot_prim_path,
+                        "/World/target",
+                        "/World/defaultGroundPlane",
+                        "/curobo",
+                        "/Ridge"
+                    ],
+                ).get_collision_check_world()
+                
             pt1 = time.time()
-            motion_gen.update_world(obstacles)
+            motion_gen.update_world(obstacles_config)
             # print("Updated World")
-            print(f"Updating world, obj num:{len(obstacles.objects)} load time:{pt1 - start} total_time {time.time() - start}")
+            print(f"Updating world, obj num:{len(obstacles_config.objects)} load time:{pt1 - start} total_time {time.time() - start}")
 
         # position and orientation of target virtual cube:
         cube_position, cube_orientation = target.get_world_pose()
@@ -387,7 +396,7 @@ def main():
             cmd_idx += 1
             # for _ in range(2):
             #     my_world.step(render=False)
-            print(f"cmd idx:{cmd_idx}/{len(cmd_plan.position[0])} vel:{cmd_state_tensor[0, DOFS:DOFS+2]}")
+            # print(f"cmd idx:{cmd_idx}/{len(cmd_plan.position[0])} vel:{cmd_state_tensor[0, DOFS:DOFS+2]}")
             if cmd_idx >= len(cmd_plan.position[0]):
                 cmd_idx = 0
                 cmd_plan = None
