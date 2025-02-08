@@ -142,7 +142,6 @@ def add_multiple_robots(
         #     stage.RemovePrim(prim.GetPath())
         #     return
         if UsdPhysics.CollisionAPI(prim):
-            print(f"hit {prim.GetName()}")
             stage.RemovePrim(prim.GetPath())
             return
         for child_prim in prim.GetChildren():

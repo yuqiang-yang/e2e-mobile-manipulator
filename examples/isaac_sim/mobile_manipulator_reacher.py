@@ -93,7 +93,7 @@ from curobo.wrap.reacher.motion_gen import (
 
 
 def main():
-    NUM_ROBOTS = 4
+    NUM_ROBOTS = 16
     # create a curobo motion gen instance:
     num_targets = 0
     # assuming obstacles are in objects_path:
@@ -234,13 +234,13 @@ def main():
 
         if step_index < 2:
             my_world.reset()
-            robot._articulation_view.initialize()
-            idx_list = [robot.get_dof_index(x) for x in j_names]
-            robot.set_joint_positions(default_config, idx_list)
-
-            robot._articulation_view.set_max_efforts(
-                values=np.array([5000 for i in range(len(idx_list))]), joint_indices=idx_list
-            )
+            for robot in robots:
+                robot._articulation_view.initialize()
+                idx_list = [robot.get_dof_index(x) for x in j_names]
+                robot.set_joint_positions(default_config, idx_list)
+                robot._articulation_view.set_max_efforts(
+                    values=np.array([50 for i in range(len(idx_list))]), joint_indices=idx_list
+                )
         if step_index < 20:
             continue
 
@@ -274,17 +274,21 @@ def main():
             target_orientation = cube_orientation
         if past_orientation is None:
             past_orientation = cube_orientation
-
-        sim_js = robot.get_joints_state()
-        sim_js_names = robot.dof_names
-
+        
+        sim_js_pos =  []
+        sim_js_vel = []
+        for robot in robots:
+            sim_js = robot.get_joints_state()
+            sim_js_pos.append(sim_js.positions)
+            sim_js_vel.append(sim_js.velocities)
+            sim_js_names = robot.dof_names
         if np.any(np.isnan(sim_js.positions)):
             log_error("isaac sim has returned NAN joint position values.")
         cu_js = JointState(
-            position=tensor_args.to_device(sim_js.positions),
-            velocity=tensor_args.to_device(sim_js.velocities),  # * 0.0,
-            acceleration=tensor_args.to_device(sim_js.velocities) * 0.0,
-            jerk=tensor_args.to_device(sim_js.velocities) * 0.0,
+            position=tensor_args.to_device(torch.Tensor(sim_js_pos)),
+            velocity=tensor_args.to_device(torch.Tensor(sim_js_vel)),  # * 0.0,
+            acceleration=tensor_args.to_device(torch.Tensor(sim_js_vel)) * 0.0,
+            jerk=tensor_args.to_device(torch.Tensor(sim_js_vel)) * 0.0,
             joint_names=sim_js_names,
         )
 
@@ -292,20 +296,17 @@ def main():
             cu_js.velocity *= 0.0
             cu_js.acceleration *= 0.0
 
-        if args.reactive and past_cmd is not None:
-            cu_js.position[:] = past_cmd.position
-            cu_js.velocity[:] = past_cmd.velocity
-            cu_js.acceleration[:] = past_cmd.acceleration
+        # if args.reactive and past_cmd is not None:
+        #     cu_js.position[:] = past_cmd.position
+        #     cu_js.velocity[:] = past_cmd.velocity
+        #     cu_js.acceleration[:] = past_cmd.acceleration
         cu_js = cu_js.get_ordered_joint_state(motion_gen.kinematics.joint_names)
 
         if args.visualize_spheres and step_index % 2 == 0:
 
-            sph_list = motion_gen.kinematics.get_robot_as_spheres(cu_js.position)
-            # import ipdb; ipdb.set_trace()
-            print(cu_js.position)
+            sph_list = motion_gen.kinematics.get_robot_as_spheres(cu_js.position[0])
             if spheres is None:
                 spheres = []
-                # create spheres:
 
                 for si, s in enumerate(sph_list[0]):
                     sp = sphere.VisualSphere(
@@ -315,17 +316,12 @@ def main():
                         color=np.array([0, 0.8, 0.2]),
                     )
                     spheres.append(sp)
-            else:
-                for si, s in enumerate(sph_list[0]):
-                    if not np.isnan(s.position[0]):
-                        spheres[si].set_world_pose(position=np.ravel(s.position))
-                        spheres[si].set_radius(float(s.radius))
+
 
         # robot_static = False
         # if (np.max(np.abs(sim_js.velocities)) < 0.6) or args.reactive:
         robot_static = True
 
-        # print(f"static : {robot_static}  cube_position: {cube_position}  target_pose: {target_pose} past_pose:{past_pose}")
         if (
             (
                 np.linalg.norm(cube_position - target_pose) > 1e-3
@@ -345,7 +341,7 @@ def main():
             )
             plan_config.pose_cost_metric = pose_metric
             result = motion_gen.plan_batch(
-                cu_js.unsqueeze(0).repeat_seeds(NUM_ROBOTS),
+                cu_js,
                 ik_goal.repeat_seeds(NUM_ROBOTS),
                 plan_config,
             )
@@ -357,7 +353,7 @@ def main():
             if succ:
                 num_targets += 1
                 # cmd_plan = result.get_interpolated_plan()
-                cmd_plan = result.optimized_plan[0]
+                cmd_plan = result.optimized_plan
                 cmd_plan = motion_gen.get_full_js(cmd_plan)
                 # get only joint names that are in both:
                 idx_list = []
@@ -381,17 +377,18 @@ def main():
         past_pose = cube_position
         past_orientation = cube_orientation
         if cmd_plan is not None:
-            cmd_state = cmd_plan[cmd_idx]
-            past_cmd = cmd_state.clone()
-
-            robot.set_joint_positions(cmd_state.position.cpu().numpy())
+            DOFS = len(robots[0].dof_names)
+            cmd_state_tensor = cmd_plan.get_state_tensor()[:,cmd_idx]
+            past_cmd = cmd_state_tensor.clone()
+            for i, robot in enumerate(robots):
+                robot.set_joint_positions(cmd_state_tensor[i, :DOFS].cpu().numpy())
             
-            if step_index % 2 == 0:
-                cmd_idx += 1
-            for _ in range(2):
-                my_world.step(render=False)
-            # print(f"cmd idx:{cmd_idx}/{len(cmd_plan.position)} pos:{cmd_state.position.cpu().numpy()} vel:{cmd_state.velocity.cpu().numpy()}")
-            if cmd_idx >= len(cmd_plan.position):
+            # if step_index % 2 == 0:
+            cmd_idx += 1
+            # for _ in range(2):
+            #     my_world.step(render=False)
+            print(f"cmd idx:{cmd_idx}/{len(cmd_plan.position[0])} vel:{cmd_state_tensor[0, DOFS:DOFS+2]}")
+            if cmd_idx >= len(cmd_plan.position[0]):
                 cmd_idx = 0
                 cmd_plan = None
                 past_cmd = None
