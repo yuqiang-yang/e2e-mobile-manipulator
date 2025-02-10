@@ -89,13 +89,14 @@ from curobo.wrap.reacher.motion_gen import (
     MotionGen,
     MotionGenConfig,
     MotionGenPlanConfig,
+    MotionGenResult
 )
 
 #####################Global Variables#######################
 NUM_ROBOTS = 4
 ready_to_plan = False
 cmd_plan = None
-cube_position = np.array([0.0, 0.0, 0.0])
+cube_position = np.zeros(3)
 cube_orientation = None
 tensor_args = None
 motion_gen = None
@@ -103,16 +104,22 @@ cu_js = None
 plan_config = None
 sim_js_names = None
 robot = None
-target_pos = np.array([0.0, 0.0, 0.0])
+target_pos = np.zeros((3, 3))
+last_success_target = np.zeros(3)
+success_result = None
+cmd_idx = 0
 ############################################################
 
 def replan_thread():
-    global cmd_plan, cmd_idx, target_pos
+    global cmd_plan, cmd_idx, target_pos, success_result, last_success_target
     while True:
         # position and orientation of target virtual cube:
         cube_position, cube_orientation = target.get_world_pose()
-        if np.linalg.norm(target_pos - cube_position) > 0.1 and ready_to_plan:
-            time.sleep(0.5) # hack
+        target_pos[-1] = cube_position.copy() 
+        if np.linalg.norm(last_success_target - cube_position) > 0.1 \
+            and np.linalg.norm(target_pos[2] - target_pos[0]) == 0.0 \
+            and ready_to_plan:
+            target_changed = np.linalg.norm(last_success_target - cube_position) > 0.1
             cube_position, cube_orientation = target.get_world_pose()
             # Set EE teleop goals, use cube for simple non-vr init:
             ee_translation_goal = cube_position
@@ -130,6 +137,8 @@ def replan_thread():
                 cu_js.clone(),
                 ik_goal.clone().repeat_seeds(NUM_ROBOTS),
                 plan_config.clone(),
+                ik_seeds=success_result.optimized_plan.position[:, -1].unsqueeze(1) if target_changed and success_result is not None else None,
+                trajopt_seeds=success_result.optimized_seeds if target_changed and success_result is not None else None 
             )
             # import ipdb; ipdb.set_trace()
             succ = result.success[0].item()  # ik_result.success.item()
@@ -151,14 +160,15 @@ def replan_thread():
                 cmd_plan = cmd_plan.get_ordered_joint_state(common_js_names)
 
                 cmd_idx = 0
-                target_pos = cube_position.copy()
-
+                last_success_target = cube_position
+                success_result = result.clone()
                 time.sleep(0.5)
             else:
-                carb.log_warn("Plan did not converge to a solution: " + str(result.status)) 
+                carb.log_warn("Plan did not converge to a solution: " + str(result.status))      
         else:
             time.sleep(0.1)
-        
+        target_pos[0] = target_pos[1]
+        target_pos[1] = target_pos[2]
 if __name__ == "__main__":
     # create a curobo motion gen instance:
     my_world = World(stage_units_in_meters=1.0)

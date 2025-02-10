@@ -1178,6 +1178,8 @@ class MotionGenResult:
     #: stores the index of the goal pose reached when planning for a goalset.
     goalset_index: Optional[torch.Tensor] = None
 
+    #: Add by yq. Store the last successful actions
+    optimized_seeds: Optional[torch.Tensor] = None
     def clone(self):
         """Clone the current result."""
         m = MotionGenResult(
@@ -1205,6 +1207,7 @@ class MotionGenResult:
             ),
             interpolation_dt=self.interpolation_dt,
             goalset_index=self.goalset_index.clone() if self.goalset_index is not None else None,
+            optimized_seeds=self.optimized_seeds.clone() if self.optimized_seeds is not None else None,
         )
         return m
 
@@ -1242,6 +1245,10 @@ class MotionGenResult:
 
         self.goalset_index = self._check_none_and_copy_idx(
             self.goalset_index, source_result.goalset_index, idx
+        )
+        
+        self.optimized_seeds = self._check_none_and_copy_idx(
+            self.optimized_seeds, source_result.optimized_seeds, idx
         )
         # NOTE: graph plan will have different shape based on success.
         # self.graph_plan = self._check_none_and_copy_idx(
@@ -1627,6 +1634,8 @@ class MotionGen(MotionGenConfig):
         goal_pose: Pose,
         plan_config: MotionGenPlanConfig = MotionGenPlanConfig(),
         link_poses: Dict[str, List[Pose]] = None,
+        ik_seeds: Optional[JointState] = None,
+        trajopt_seeds: Optional[JointState] = None,
     ) -> MotionGenResult:
         """Plan motions to reach a batch of goal poses from a batch of start joint states.
 
@@ -1652,6 +1661,8 @@ class MotionGen(MotionGenConfig):
             goal_pose,
             plan_config,
             link_poses=link_poses,
+            ik_seeds=ik_seeds,
+            trajopt_seeds=trajopt_seeds
         )
         return result
 
@@ -2799,6 +2810,7 @@ class MotionGen(MotionGenConfig):
         use_nn_seed: bool,
         partial_ik_opt: bool,
         link_poses: Optional[Dict[str, Pose]] = None,
+        seeds: Optional[JointState] = None
     ) -> IKResult:
         """Solve inverse kinematics from solve state, used by motion generation planning call.
 
@@ -2821,13 +2833,14 @@ class MotionGen(MotionGenConfig):
             solve_state.solve_type,
             goal_pose,
             start_state.position.view(-1, self._dof),
-            start_state.position.view(-1, 1, self._dof),
+            start_state.position.view(-1, 1, self._dof) if seeds is None else seeds,
             solve_state.num_trajopt_seeds,
             solve_state.num_ik_seeds,
             use_nn_seed,
             newton_iters,
             link_poses,
         )
+
         return ik_result
 
     @profiler.record_function("motion_gen/trajopt_solve")
@@ -3129,6 +3142,8 @@ class MotionGen(MotionGenConfig):
         goal_pose: Pose,
         plan_config: MotionGenPlanConfig = MotionGenPlanConfig(),
         link_poses: Optional[Dict[str, Pose]] = None,
+        ik_seeds: Optional[JointState] = None,
+        trajopt_seeds: Optional[JointState] = None,
     ):
         """Plan batch attempts for a given reacher solve state.
 
@@ -3197,6 +3212,8 @@ class MotionGen(MotionGenConfig):
                 goal_pose,
                 plan_config,
                 link_poses=link_poses,
+                ik_seeds=ik_seeds,
+                trajopt_seeds=trajopt_seeds
             )
 
             time_dict["solve_time"] += result.solve_time
@@ -3588,6 +3605,7 @@ class MotionGen(MotionGenConfig):
             result.optimized_dt = traj_result.optimized_dt
             result.optimized_plan = traj_result.solution
             result.goalset_index = traj_result.goalset_index
+            result.optimized_seeds = traj_result.optimized_seeds
         return result
 
     def _plan_js_from_solve_state(
@@ -3836,7 +3854,9 @@ class MotionGen(MotionGenConfig):
         goal_pose: Pose,
         plan_config: MotionGenPlanConfig = MotionGenPlanConfig(),
         link_poses: Optional[Dict[str, Pose]] = None,
-    ) -> MotionGenResult:
+        ik_seeds: Optional[JointState] = None,
+        trajopt_seeds: Optional[JointState] = None,
+        ) -> MotionGenResult:
         """Plan from a given reacher solve state in batch mode.
 
         Args:
@@ -3850,7 +3870,8 @@ class MotionGen(MotionGenConfig):
             MotionGenResult: Result of planning.
         """
         self._trajopt_goal_config[:] = self.get_retract_config().view(1, 1, self._dof)
-        trajopt_seed_traj = None
+        # trajopt_seed_traj = None
+        trajopt_seed_traj = trajopt_seeds
         trajopt_seed_success = None
         trajopt_newton_iters = None
         graph_success = 0
@@ -3863,6 +3884,7 @@ class MotionGen(MotionGenConfig):
             plan_config.use_nn_ik_seed,
             plan_config.partial_ik_opt,
             link_poses,
+            seeds=ik_seeds
         )
 
         if not plan_config.enable_graph and plan_config.partial_ik_opt:
@@ -3986,7 +4008,6 @@ class MotionGen(MotionGenConfig):
                     if self.store_debug_in_result:
                         result.debug_info = {"graph_debug": graph_result.debug_info}
                     return result
-
         if plan_config.enable_opt:
             # get goal configs based on ik success:
             self._trajopt_goal_config[ik_result.success] = goal_config
@@ -4018,7 +4039,6 @@ class MotionGen(MotionGenConfig):
                 )
                 if trajopt_seed_traj is not None:
                     trajopt_seed_traj = trajopt_seed_traj.transpose(0, 1).contiguous()
-
                 # create seeds here:
                 trajopt_seed_traj = self.trajopt_solver.get_seed_set(
                     seed_goal,
@@ -4036,7 +4056,6 @@ class MotionGen(MotionGenConfig):
             if plan_config.enable_finetune_trajopt:
                 og_value = self.trajopt_solver.interpolation_type
                 self.trajopt_solver.interpolation_type = InterpolateType.LINEAR_CUDA
-
             traj_result = self._solve_trajopt_from_solve_state(
                 goal,
                 solve_state,
@@ -4095,6 +4114,7 @@ class MotionGen(MotionGenConfig):
             result.path_buffer_last_tstep = traj_result.path_buffer_last_tstep
             result.optimized_plan = traj_result.solution
             result.optimized_dt = traj_result.optimized_dt
+            result.optimized_seeds = traj_result.optimized_seeds.clone()
             if torch.count_nonzero(traj_result.success) == 0:
                 result.status = MotionGenStatus.TRAJOPT_FAIL
                 result.success[:] = False
