@@ -71,6 +71,7 @@ from helper import *
 from omni.isaac.core import World
 from omni.isaac.core.objects import cuboid
 from omni.isaac.core.utils.types import ArticulationAction
+import omni.kit.actions.core
 
 # CuRobo
 from curobo.util.logger import setup_curobo_logger
@@ -252,9 +253,17 @@ def main():
     cmd_state_full = None
     step = 0
     add_extensions(simulation_app, args.headless_mode)
-    prims_with_trajectories = add_random_objects(my_world, 50, 50, obs_range=10, dynamic=False)
+    prims_with_trajectories = add_random_objects(my_world, 50, 50, obs_range=10, dynamic=True)
     
     obstacles_config = None
+    
+    
+    ##### Isaac custom config #######
+    action_registry = omni.kit.actions.core.get_action_registry()
+
+    # switches to camera lighting
+    action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_camera")
+    action.execute()
     while simulation_app.is_running():
         if not init_world:
             for _ in range(10):
@@ -307,7 +316,7 @@ def main():
                         "/Ridge"
                     ],
                 ).get_collision_check_world()
-                mpc.update_world(obstacles_config)
+            mpc.update_world(obstacles_config)
 
         # position and orientation of target virtual cube:
         cube_position, cube_orientation = target.get_world_pose()
