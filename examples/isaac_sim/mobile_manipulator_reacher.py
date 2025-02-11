@@ -91,11 +91,11 @@ from curobo.wrap.reacher.motion_gen import (
     MotionGenPlanConfig,
     MotionGenResult
 )
-from traj_server import TrajServer
+from traj_server import *
 
 #####################Global Variables#######################
 NUM_ROBOTS = 4
-PLAN_AHEAD_TIME = 0.1
+PLAN_AHEAD_TIME = 0.15
 ready_to_plan = False
 cube_position = np.zeros(3)
 cube_orientation = None
@@ -117,9 +117,7 @@ def replan_thread():
         # position and orientation of target virtual cube:
         cube_position, cube_orientation = target.get_world_pose()
         target_pos[-1] = cube_position.copy()
-        if np.linalg.norm(last_success_target - cube_position) > 0.1 \
-            and np.linalg.norm(target_pos[2] - target_pos[0]) == 0.0 \
-            and ready_to_plan:
+        if ready_to_plan:
             target_unchanged = np.linalg.norm(last_success_target - cube_position) < 0.1
             cube_position, cube_orientation = target.get_world_pose()
             # Set EE teleop goals, use cube for simple non-vr init:
@@ -146,31 +144,33 @@ def replan_thread():
                 )
                 replan = False
             else:
+                DOFS = 12
                 plan_time = time.time() + PLAN_AHEAD_TIME
                 plan_state = traj_server.get_robot_state(plan_time)
                 cu_js = JointState(
-                    position=tensor_args.to_device(plan_state),
-                    velocity=tensor_args.to_device(plan_state)* 0.0,
-                    acceleration=tensor_args.to_device(plan_state) * 0.0,
-                    jerk=tensor_args.to_device(plan_state) * 0.0,
+                    position=tensor_args.to_device(plan_state[:, :DOFS]),
+                    velocity=tensor_args.to_device(plan_state[:, DOFS:2*DOFS]),
+                    acceleration=tensor_args.to_device(plan_state[:, 2*DOFS:3*DOFS]),
+                    jerk=tensor_args.to_device(plan_state[:, :DOFS]) * 0.0,
                     joint_names=sim_js_names,
                 )
 
             cu_js = cu_js.get_ordered_joint_state(motion_gen.kinematics.joint_names)
-
+            
 
             result = motion_gen.plan_batch(
                 cu_js.clone(),
                 ik_goal.clone().repeat_seeds(NUM_ROBOTS),
                 plan_config.clone(),
-                ik_seeds=success_result.optimized_plan.position[:, -1].unsqueeze(1) if target_unchanged and success_result is not None else None,
-                trajopt_seeds=success_result.optimized_seeds if target_unchanged and success_result is not None else None
+                ik_seeds=success_result.optimized_plan.position[:, -1].unsqueeze(1).repeat(1, 16, 1) if target_unchanged and success_result is not None else None,
+                trajopt_seeds=shift_seeds(success_result.optimized_seeds, 1) if target_unchanged and success_result is not None else None
             )
+                
             # import ipdb; ipdb.set_trace()
             succ = result.success[0].item()  # ik_result.success.item()
-            print(f"result ik time:{result.ik_time:.3f} graph time:{result.graph_time:.3f} " \
-                    f"opt_time:{result.trajopt_time:.3f} finetune:{result.finetune_time:.3f} total:{result.total_time:.3f} " \
-                    f"attemps:{result.attempts} opt_attemps:{result.trajopt_attempts}")
+            # print(f"result ik time:{result.ik_time:.3f} graph time:{result.graph_time:.3f} " \
+            #         f"opt_time:{result.trajopt_time:.3f} finetune:{result.finetune_time:.3f} total:{result.total_time:.3f} " \
+            #         f"attemps:{result.attempts} opt_attemps:{result.trajopt_attempts}")
             if succ:
                 num_steps = result.optimized_plan.position.shape[1]                
                 # cmd_plan = result.get_interpolated_plan()
@@ -184,29 +184,33 @@ def replan_thread():
                         common_js_names.append(x)
 
                 cmd_plan = cmd_plan.get_ordered_joint_state(common_js_names)
+                traj_server.writing = True
                 if time.time() >= plan_time:
                     traj_server.set_trajectory(
-                        cmd_plan.position,
+                        torch.concat((cmd_plan.position, cmd_plan.velocity, cmd_plan.acceleration), dim = -1),
                         torch.linspace(
                             plan_time,
                             plan_time +
                             (num_steps - 1) * (result.optimized_dt[0].cpu().numpy()),
                             steps=(num_steps),
                             dtype=torch.float64))
+                    # print("replace")
                 else:
                     traj_server.trim_sub_trajectory(time.time(), plan_time)
                     traj_server.concat_trajectory(
-                        cmd_plan.position,
+                        torch.concat((cmd_plan.position, cmd_plan.velocity, cmd_plan.acceleration), dim = -1),
                         torch.linspace(
                             plan_time,
                             plan_time +
                             (num_steps - 1) * (result.optimized_dt[0].cpu().numpy()),
                             steps=(num_steps),
                             dtype=torch.float64))
-
+                # print(traj_server.time_stamps.shape,"concat", traj_server.time_stamps - 1.7391e9)
+                traj_server.writing = False
+                traj_server.plot_trajectory()
                 last_success_target = cube_position
                 success_result = result.clone()
-                time.sleep(0.1)
+                # time.sleep(0.1)
             else:
                 carb.log_warn("Plan did not converge to a solution: " + str(result.status))
         else:
@@ -284,6 +288,7 @@ if __name__ == "__main__":
         trajopt_dt=trajopt_dt,
         trajopt_tsteps=trajopt_tsteps,
         trim_steps=trim_steps,
+        trajopt_particle_opt=False
     )
     motion_gen = MotionGen(motion_gen_config)
     if not args.reactive:
@@ -298,7 +303,7 @@ if __name__ == "__main__":
         enable_graph=False,
         enable_graph_attempt=2,
         max_attempts=max_attempts,
-        enable_finetune_trajopt=enable_finetune_trajopt,
+        enable_finetune_trajopt=enable_finetune_trajopt
     )
 
     usd_help.load_stage(my_world.stage)
@@ -400,9 +405,10 @@ if __name__ == "__main__":
         #             spheres.append(sp)
         ready_to_plan = True
         if traj_server.ready():
+            DOFS = len(robots[0].dof_names)
             for i, robot in enumerate(robots):
                 state = traj_server.get_robot_state(time.time(), batch_idx = i)
-                robot.set_joint_positions(state.cpu().numpy())
+                robot.set_joint_positions(state[:DOFS].cpu().numpy())
 
     simulation_app.close()
 

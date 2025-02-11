@@ -48,8 +48,8 @@ cost:
 
   cspace_cfg:
     weight: 10000.0
-    terminal: True
-    run_weight: 0.0
+    terminal: False
+    run_weight: 0.5
 
   bound_cfg:
     weight: [0.1, 0.1,0.0,0.0]

@@ -3185,7 +3185,7 @@ class MotionGen(MotionGenConfig):
             plan_config.enable_graph_attempt is not None
             and plan_config.max_attempts >= plan_config.enable_graph_attempt
         ):
-            log_warn("Batch mode enable graph is only supported with num_graph_seeds==1")
+            # log_warn("Batch mode enable graph is only supported with num_graph_seeds==1")
             plan_config.num_trajopt_seeds = 1
             plan_config.num_graph_seeds = 1
             solve_state.num_trajopt_seeds = 1

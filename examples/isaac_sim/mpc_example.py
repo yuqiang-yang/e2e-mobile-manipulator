@@ -354,7 +354,7 @@ def main():
         cmd_state_full = cmd_state
 
         art_action = ArticulationAction(
-            cmd_state.position.cpu().numpy(),
+            cmd_state.position[0].cpu().numpy(),
             # cmd_state.velocity.cpu().numpy(),
             joint_indices=idx_list,
         )
