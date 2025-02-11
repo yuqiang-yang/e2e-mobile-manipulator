@@ -20,7 +20,7 @@ except ImportError:
 
 # Third Party
 import torch
-
+import time
 a = torch.zeros(4, device="cuda:0")
 
 # Standard Library
@@ -67,7 +67,7 @@ import os
 # Third Party
 import carb
 import numpy as np
-from helper import add_robot_to_scene
+from helper import *
 from omni.isaac.core import World
 from omni.isaac.core.objects import cuboid
 from omni.isaac.core.utils.types import ArticulationAction
@@ -161,8 +161,8 @@ def main():
 
     setup_curobo_logger("warn")
     past_pose = None
-    n_obstacle_cuboids = 30
-    n_obstacle_mesh = 10
+    n_obstacle_cuboids = 10
+    n_obstacle_mesh = 150
 
     # warmup curobo instance
     usd_help = UsdHelper()
@@ -178,7 +178,7 @@ def main():
 
     robot, robot_prim_path = add_robot_to_scene(robot_cfg, my_world)
 
-    articulation_controller = robot.get_articulation_controller()
+    # articulation_controller = robot.get_articulation_controller()
 
     world_cfg_table = WorldConfig.from_dict(
         load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
@@ -214,8 +214,8 @@ def main():
     mpc_config = MpcSolverConfig.load_from_robot_config(
         robot_cfg,
         world_cfg,
-        use_cuda_graph=False,
-        use_cuda_graph_metrics=False,
+        use_cuda_graph=True,
+        use_cuda_graph_metrics=True,
         use_cuda_graph_full_step=False,
         self_collision_check=True,
         collision_checker_type=CollisionCheckerType.MESH,
@@ -252,6 +252,9 @@ def main():
     cmd_state_full = None
     step = 0
     add_extensions(simulation_app, args.headless_mode)
+    prims_with_trajectories = add_random_objects(my_world, 50, 50, obs_range=10, dynamic=False)
+    
+    obstacles_config = None
     while simulation_app.is_running():
         if not init_world:
             for _ in range(10):
@@ -264,6 +267,19 @@ def main():
             continue
 
         step_index = my_world.current_time_step_index
+        if obstacles_config is not None:
+            name2idx = {}
+            for i, mesh in enumerate(obstacles_config.mesh):
+                name2idx[mesh.name] = i
+        #update dynamic obstacle pos
+        for prim, initial_position, amplitude, angle, period in prims_with_trajectories:
+            dx, dy, dz = calculate_position_offset(step_index, amplitude, angle, period)
+            new_x = initial_position[0] + dx
+            new_y = initial_position[1] + dy
+            new_z = initial_position[2] + dz
+            UsdGeom.XformCommonAPI(prim).SetTranslate((new_x, new_y, new_z))
+            if obstacles_config is not None:
+                obstacles_config.mesh[name2idx["/World/" + prim.GetName()]].pose = [new_x, new_y, new_z, 1, 0, 0, 0]
 
         if step_index <= 2:
             my_world.reset()
@@ -278,20 +294,20 @@ def main():
             init_curobo = True
         step += 1
         step_index = step
-        if step_index % 1000 == 0:
-            print("Updating world")
-            obstacles = usd_help.get_obstacles_from_stage(
-                # only_paths=[obstacles_path],
-                ignore_substring=[
-                    robot_prim_path,
-                    "/World/target",
-                    "/World/defaultGroundPlane",
-                    "/curobo",
-                ],
-                reference_prim_path=robot_prim_path,
-            )
-            obstacles.add_obstacle(world_cfg_table.cuboid[0])
-            mpc.world_coll_checker.load_collision_model(obstacles)
+        if True:
+            if obstacles_config is None:
+                obstacles_config = usd_help.get_obstacles_from_stage(
+                    # only_paths=[obstacles_path],
+                    reference_prim_path=robot_prim_path,
+                    ignore_substring=[
+                        robot_prim_path,
+                        "/World/target",
+                        "/World/defaultGroundPlane",
+                        "/curobo",
+                        "/Ridge"
+                    ],
+                ).get_collision_check_world()
+                mpc.update_world(obstacles_config)
 
         # position and orientation of target virtual cube:
         cube_position, cube_orientation = target.get_world_pose()
@@ -317,7 +333,9 @@ def main():
         sim_js = robot.get_joints_state()
         js_names = robot.dof_names
         sim_js_names = robot.dof_names
-
+        if sim_js is None:
+            time.sleep(0.2)
+            continue
         cu_js = JointState(
             position=tensor_args.to_device(sim_js.positions),
             velocity=tensor_args.to_device(sim_js.velocities) * 0.0,
@@ -339,6 +357,7 @@ def main():
         current_state.copy_(cu_js)
 
         mpc_result = mpc.step(current_state, max_attempts=2)
+        print("mpc step time", mpc_result.solve_time)
         # ik_result = ik_solver.solve_single(ik_goal, cu_js.position.view(1,-1), cu_js.position.view(1,1,-1))
 
         succ = True  # ik_result.success.item()
@@ -353,19 +372,15 @@ def main():
         cmd_state = cmd_state_full.get_ordered_joint_state(common_js_names)
         cmd_state_full = cmd_state
 
-        art_action = ArticulationAction(
-            cmd_state.position[0].cpu().numpy(),
-            # cmd_state.velocity.cpu().numpy(),
-            joint_indices=idx_list,
-        )
         # positions_goal = articulation_action.joint_positions
         if step_index % 1000 == 0:
             print(mpc_result.metrics.feasible.item(), mpc_result.metrics.pose_error.item())
 
         if succ:
             # set desired joint angles obtained from IK:
-            for _ in range(3):
-                articulation_controller.apply_action(art_action)
+            # for _ in range(3):
+            #     articulation_controller.apply_action(art_action)
+            robot.set_joint_positions(cmd_state.position[0].cpu().numpy())
 
         else:
             carb.log_warn("No action is being taken.")
