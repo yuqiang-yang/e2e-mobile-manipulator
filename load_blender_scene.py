@@ -4,6 +4,7 @@ import bpy
 import torch
 import argparse
 import time
+import re
 
 from typing import List 
 
@@ -50,17 +51,37 @@ def hide_collection(collection_name):
         collection.hide_render = True
         collection.hide_select = True
 
-def get_world_config(objs : List[Entity]):
+def get_world_config(objs : List[Entity]) -> WorldConfig:
     obstacles = {"mesh" : []}
     print("get world config start")
-    for obj in objs:
+    pattern = r'\((\d+)\)'
+    ignore_asset_id = []
+    id_to_placeholder_idx = {}
+    for i, obj in enumerate(objs):
         if isinstance(obj, MeshObject):
-            # import ipdb; ipdb.set_trace()
+            scale = obj.get_scale()
+            name = obj.get_name()
+
+            if "ceiling" in name.lower() or "exterior" in name.lower():
+                continue
+            if "0/0" in name.lower() and "wall" not in name.lower():
+                continue
+            if "placeholder" in name.lower():
+                match = re.search(pattern, name)
+                id = match.group(1)
+                id_to_placeholder_idx[id] = i
+                print(f"########### {name}", " id", id)
+                continue
             
             blender_mesh = obj.get_mesh()
 
             vertices = np.array([vertex.co[:] for vertex in blender_mesh.vertices])
-
+            if vertices.shape[0] > 4.0e4:
+                match = re.search(pattern, name)
+                id = match.group(1)
+                ignore_asset_id.append(id)
+                print(f"********* {name}", " id", id)
+                continue
             # for polygon in blender_mesh.polygons:
             #     face_vertices = polygon.vertices[:]
             #     if len(face_vertices) == 3:
@@ -77,9 +98,8 @@ def get_world_config(objs : List[Entity]):
             tensor_mat = tensor_args.to_device(matrix_world)
             pose = Pose.from_matrix(tensor_mat).tolist()
 
-            scale = obj.get_scale()
-            name = obj.get_name()
-            print(f"name {name}, vertices num: {len(vertices)}  faces num: {len(faces)}")
+
+            # print(f"name {name}, vertices num: {vertices.shape}  faces num: {len(faces)}")
 
             curobo_mesh = Mesh(
                 name=name,
@@ -91,6 +111,35 @@ def get_world_config(objs : List[Entity]):
 
             obstacles["mesh"].append(curobo_mesh)
 
+    for id in ignore_asset_id:
+        if id in id_to_placeholder_idx:
+            obj = objs[id_to_placeholder_idx[id]]
+            scale = obj.get_scale()
+            name = obj.get_name()
+            print(f"add placehold for {name}     id {id}")
+
+            blender_mesh = obj.get_mesh()
+
+            vertices = np.array([vertex.co[:] for vertex in blender_mesh.vertices])
+            
+            faces = np.zeros((len(blender_mesh.polygons), 3))
+            for i, polygon in enumerate(blender_mesh.polygons):
+                faces[i] = polygon.vertices[:3]
+        
+            matrix_world = np.array(obj.get_local2world_mat())
+            tensor_mat = tensor_args.to_device(matrix_world)
+            pose = Pose.from_matrix(tensor_mat).tolist()
+
+            curobo_mesh = Mesh(
+                name=name,
+                pose=pose,
+                vertices=vertices.tolist(),
+                faces=faces.tolist(),
+                scale=scale
+            )
+
+            obstacles["mesh"].append(curobo_mesh)
+                
     world_model = WorldConfig(**obstacles)
     
     return world_model
@@ -250,9 +299,12 @@ goal_state = motion_gen.rollout_fn.compute_kinematics(curobo_joint_state)
 ee_pose = Pose(goal_state.ee_pos_seq, quaternion=goal_state.ee_quat_seq)
 cube = bproc.object.create_primitive("CUBE", scale=[0.05, 0.05, 0.05], location=ee_pose.position[0].cpu().numpy())
 
-# curobo_world_config  = get_world_config(objs)
+curobo_world_config  = get_world_config(objs)
+collision_supported_world = WorldConfig.create_collision_support_world(curobo_world_config)
+collision_supported_world.save_world_as_mesh("debug_collision_mesh.obj")
+
 print("start update world")
-# motion_gen.update_world(curobo_world_config.clone())
+motion_gen.update_world(curobo_world_config.clone())
 print("finish update world")
 # timer1 = bpy.app.timers.register(update_callback)
 timer2 = bpy.app.timers.register(motion_plan_callback)
