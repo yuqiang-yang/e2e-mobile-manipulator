@@ -54,21 +54,24 @@ def hide_collection(collection_name):
 def get_world_config(objs : List[Entity]) -> WorldConfig:
     obstacles = {"mesh" : []}
     print("get world config start")
-    pattern = r'\((\d+)\)'
+    pattern = r'\((\d+)\)[^()]*\((\d+)\)'
+
     ignore_asset_id = []
     id_to_placeholder_idx = {}
     for i, obj in enumerate(objs):
         if isinstance(obj, MeshObject):
             scale = obj.get_scale()
             name = obj.get_name()
-
-            if "ceiling" in name.lower() or "exterior" in name.lower():
+            if "ceiling" in name.lower() or "exterior" in name.lower() or "floor" in name.lower() \
+                or "rug" in name.lower() or "door" in name.lower() or "window" in name.lower() or \
+                    "open" in name.lower():
                 continue
             if "0/0" in name.lower() and "wall" not in name.lower():
                 continue
+
             if "placeholder" in name.lower():
                 match = re.search(pattern, name)
-                id = match.group(1)
+                id = match.group(2)
                 id_to_placeholder_idx[id] = i
                 print(f"########### {name}", " id", id)
                 continue
@@ -78,10 +81,11 @@ def get_world_config(objs : List[Entity]) -> WorldConfig:
             vertices = np.array([vertex.co[:] for vertex in blender_mesh.vertices])
             if vertices.shape[0] > 4.0e4:
                 match = re.search(pattern, name)
-                id = match.group(1)
+                id = match.group(2)
                 ignore_asset_id.append(id)
                 print(f"********* {name}", " id", id)
                 continue
+            # faces = []
             # for polygon in blender_mesh.polygons:
             #     face_vertices = polygon.vertices[:]
             #     if len(face_vertices) == 3:
@@ -198,29 +202,35 @@ def motion_plan_callback():
             cmd_trajs = None
         return 0.15
     #####################################################################################################
-    
-    if np.linalg.norm(cube.get_location() - last_success_target) > 0.2:
+    cube_position = cube.get_location()
+    cube_position[2] = np.clip(cube_position[2], 0.4, 1.0)
+    if np.linalg.norm(cube_position - last_success_target) > 0.2:
         ik_goal = Pose(
-            position=tensor_args.to_device(cube.get_location()),
+            position=tensor_args.to_device(cube_position),
             quaternion=tensor_args.to_device([0, 1, 0, 0]),
         )
         print(f"start motion plan")
         curobo_joint_state = JointState.from_position(tensor_args.to_device(curobo_state[:, :10]), joint_names=motion_gen.rollout_fn.joint_names)
         tt = time.time()
         # import ipdb; ipdb.set_trace()
-        result = motion_gen.plan_batch(
-                        curobo_joint_state,
-                        ik_goal.repeat_seeds(NUM_ROBOTS),
-                        plan_config,
+        try:
+            result = motion_gen.plan_batch(
+                            curobo_joint_state.clone(),
+                            ik_goal.clone().repeat_seeds(NUM_ROBOTS),
+                            plan_config,
                     )
+        except:
+            import ipdb; ipdb.set_trace()
         if result.success[0]:
             cmd_trajs = cs_to_bs(motion_gen.get_full_js(result.optimized_plan).position.cpu().numpy()[:, :, :10])
             cmd_idx = 0
             task_finish = False
-            last_success_target = cube.get_location()
+            last_success_target = cube_position
         print(f"result: {result.success} status:{result.status} time:{result.total_time}")
         print(f"motion plan time: {time.time() - tt}")
         
+        if not result.success[0]:
+            return 0.05
     return 3.0  # 每秒调用一次
 bproc.init()
 
@@ -232,6 +242,8 @@ objs = bproc.loader.load_blend(
 
 hide_collection("unique_assets:room_exterior")
 hide_collection("unique_assets:room_ceiling")
+bpy.context.window.workspace = bpy.data.workspaces["yuqiang"]
+bpy.context.view_layer.update()
 
 # load robot
 robots = []
@@ -243,7 +255,7 @@ for i in range(NUM_ROBOTS):
 start_poses, end_poses = get_start_and_goal(objs)
 
 init_arm_pose = np.array([0.0, -1.3, 0.0, -2.5, 0.0, 1.0, 0.0 , 0.0])
-blender_state = np.concatenate([start_poses[0], [np.pi/2], init_arm_pose])
+blender_state = np.concatenate([start_poses[0] - 0.5, [np.pi/2], init_arm_pose])
 set_robots_state(robots, blender_state)
 
 # init curobo
@@ -306,7 +318,6 @@ collision_supported_world.save_world_as_mesh("debug_collision_mesh.obj")
 print("start update world")
 motion_gen.update_world(curobo_world_config.clone())
 print("finish update world")
-# timer1 = bpy.app.timers.register(update_callback)
 timer2 = bpy.app.timers.register(motion_plan_callback)
 
 # while True:
