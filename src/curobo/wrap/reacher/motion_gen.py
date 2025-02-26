@@ -3892,7 +3892,7 @@ class MotionGen(MotionGenConfig):
 
         # check for success:
         result = MotionGenResult(
-            ik_result.success,
+            ik_result.success.clone(),
             position_error=ik_result.position_error,
             rotation_error=ik_result.rotation_error,
             ik_time=ik_result.solve_time,
