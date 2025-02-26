@@ -1,4 +1,5 @@
 import blenderproc as bproc
+import concurrent.futures
 import numpy as np
 import bpy
 import torch
@@ -33,7 +34,7 @@ from curobo.wrap.reacher.motion_gen import (
     MotionGenResult
 )
 
-
+# region Global
 #####################Global Variables#######################
 NUM_ROBOTS = 2
 last_success_target = np.zeros(3)
@@ -44,6 +45,7 @@ cmd_idx = 0
 cmd_trajs = None
 ############################################################
 
+# region Function
 def hide_collection(collection_name):
     collection = bpy.data.collections.get(collection_name)
     if collection:
@@ -187,7 +189,7 @@ def set_robots_state(robots :  List[URDFObject], state : np.ndarray):
             robot.set_rotation_euler_fk(link, rotation_euler=state[i][j+BASE_SHIFT], mode='absolute')
             curobo_state[i][j+3] = state[i][j+BASE_SHIFT] # joint angles
             
-
+# region Callback
 def motion_plan_callback():
     global last_success_target, cmd_idx, cmd_trajs, task_finish
     print(f"Motion plan is running... Cube position: {cube.get_location()}. task_finish: {task_finish}")
@@ -219,8 +221,10 @@ def motion_plan_callback():
                             ik_goal.clone().repeat_seeds(NUM_ROBOTS),
                             plan_config,
                     )
-        except:
-            import ipdb; ipdb.set_trace()
+        except Exception as e:
+            print("plan inner error",e)
+            return 0.05
+            # import ipdb; ipdb.set_trace()
         if result.success[0]:
             cmd_trajs = cs_to_bs(motion_gen.get_full_js(result.optimized_plan).position.cpu().numpy()[:, :, :10])
             cmd_idx = 0
@@ -232,24 +236,42 @@ def motion_plan_callback():
         if not result.success[0]:
             return 0.05
     return 3.0  # 每秒调用一次
+
+
+# region Main
 bproc.init()
 
 # load scene
+# objs = bproc.loader.load_blend(
+#     path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_no_plantandshlefobj/14ec7b18/fine/scene.blend",
+#     obj_types=['mesh', 'curve', 'hair', 'armature','empty', 'light', 'camera'],
+#     data_blocks=['armatures', 'cameras', 'collections', 'curves', 'images', 'lights', 'materials', 'meshes', 'objects', 'textures'])
 objs = bproc.loader.load_blend(
     path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_no_plantandshlefobj/14ec7b18/fine/scene.blend",
-    obj_types=['mesh', 'curve', 'hair', 'armature','empty', 'light', 'camera'],
-    data_blocks=['armatures', 'cameras', 'collections', 'curves', 'images', 'lights', 'materials', 'meshes', 'objects', 'textures'])
-
+    obj_types=['mesh', 'armature', 'camera'],
+    data_blocks=['armatures', 'cameras', 'collections', 'meshes', 'objects'])
 hide_collection("unique_assets:room_exterior")
 hide_collection("unique_assets:room_ceiling")
 bpy.context.window.workspace = bpy.data.workspaces["yuqiang"]
 bpy.context.view_layer.update()
 
 # load robot
+
 robots = []
-for i in range(NUM_ROBOTS):
-    robot = bproc.loader.load_urdf(urdf_file="/ssd/yangyuqiang/curobo/src/curobo/content/assets/robot/ridgeback_franka/RidgebackFranka.urdf" + str(i))
-    robots.append(robot)
+tensor_args = TensorDeviceType()
+
+urdf_file="/ssd/yangyuqiang/curobo/src/curobo/content/assets/robot/ridgeback_franka/RidgebackFranka.urdf"
+with concurrent.futures.ThreadPoolExecutor() as executor:
+    futures = [executor.submit(get_world_config, objs)]
+    
+    for i in range(NUM_ROBOTS):
+        robot = bproc.loader.load_urdf(urdf_file="/ssd/yangyuqiang/curobo/src/curobo/content/assets/robot/ridgeback_franka/RidgebackFranka.urdf" + str(i))
+        print("load success")
+        robots.append(robot)
+
+    for future in concurrent.futures.as_completed(futures):
+        curobo_world_config = future.result()
+    
 
 # get start and desired pose
 start_poses, end_poses = get_start_and_goal(objs)
@@ -258,11 +280,10 @@ init_arm_pose = np.array([0.0, -1.3, 0.0, -2.5, 0.0, 1.0, 0.0 , 0.0])
 blender_state = np.concatenate([start_poses[0] - 0.5, [np.pi/2], init_arm_pose])
 set_robots_state(robots, blender_state)
 
-# init curobo
+# region Curobo
 setup_curobo_logger("warn")
 n_obstacle_mesh = 400
 n_obstacle_cuboids = 50
-tensor_args = TensorDeviceType()
 robot_cfg_path = get_robot_configs_path()
 robot_cfg = load_yaml(join_path(robot_cfg_path, "ridgeback_franka.yml"))["robot_cfg"]
 
@@ -311,10 +332,10 @@ goal_state = motion_gen.rollout_fn.compute_kinematics(curobo_joint_state)
 ee_pose = Pose(goal_state.ee_pos_seq, quaternion=goal_state.ee_quat_seq)
 cube = bproc.object.create_primitive("CUBE", scale=[0.05, 0.05, 0.05], location=ee_pose.position[0].cpu().numpy())
 
-curobo_world_config  = get_world_config(objs)
 collision_supported_world = WorldConfig.create_collision_support_world(curobo_world_config)
 collision_supported_world.save_world_as_mesh("debug_collision_mesh.obj")
 
+# region Timerg
 print("start update world")
 motion_gen.update_world(curobo_world_config.clone())
 print("finish update world")
