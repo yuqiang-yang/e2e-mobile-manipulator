@@ -68,49 +68,49 @@
     <parent link="robot1_RidgebackFranka_panda_link0"/>
     <child link="robot1_RidgebackFranka_panda_link1"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-2.9670997" upper="2.9670997" effort="5220." velocity="2.1749999"/>
+    <limit lower="-2.9670997" upper="2.9670997" effort="5220." velocity="12.1749999"/>
   </joint>
   <joint name="robot1_panda_joint2" type="revolute">
     <origin xyz="0. 0. 0." rpy="0. 0. 1.5707964"/>
     <parent link="robot1_RidgebackFranka_panda_link1"/>
     <child link="robot1_RidgebackFranka_panda_link2"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-1.8325998" upper="1.8325998" effort="5220." velocity="2.1749999"/>
+    <limit lower="-1.8325998" upper="1.8325998" effort="5220." velocity="12.1749999"/>
   </joint>
   <joint name="robot1_panda_joint3" type="revolute">
     <origin xyz="0. -0.316 0. " rpy="0. 0. -1.5707964"/>
     <parent link="robot1_RidgebackFranka_panda_link2"/>
     <child link="robot1_RidgebackFranka_panda_link3"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-2.9670997" upper="2.9670997" effort="5220." velocity="2.1749999"/>
+    <limit lower="-2.9670997" upper="2.9670997" effort="5220." velocity="12.1749999"/>
   </joint>
   <joint name="robot1_panda_joint4" type="revolute">
     <origin xyz="0. 0. -0.0825" rpy="0. 0. -1.5707964"/>
     <parent link="robot1_RidgebackFranka_panda_link3"/>
     <child link="robot1_RidgebackFranka_panda_link4"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-2.9999998" upper="0.087" effort="5220." velocity="2.1749999"/>
+    <limit lower="-2.9999998" upper="0.087" effort="5220." velocity="12.1749999"/>
   </joint>
   <joint name="robot1_panda_joint5" type="revolute">
     <origin xyz="0. 0.384 0.0825" rpy="0. 0. 1.5707964"/>
     <parent link="robot1_RidgebackFranka_panda_link4"/>
     <child link="robot1_RidgebackFranka_panda_link5"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-2.9670997" upper="2.9670997" effort="720." velocity="2.6099999"/>
+    <limit lower="-2.9670997" upper="2.9670997" effort="720." velocity="12.6099999"/>
   </joint>
   <joint name="robot1_panda_joint6" type="revolute">
     <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
     <parent link="robot1_RidgebackFranka_panda_link5"/>
     <child link="robot1_RidgebackFranka_panda_link6"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-0.0873" upper="2.9999998" effort="720." velocity="2.6099999"/>
+    <limit lower="-0.0873" upper="2.9999998" effort="720." velocity="12.6099999"/>
   </joint>
   <joint name="robot1_panda_joint7" type="revolute">
     <origin xyz="0. 0. -0.088" rpy="0. 0. -1.5707964"/>
     <parent link="robot1_RidgebackFranka_panda_link6"/>
     <child link="robot1_RidgebackFranka_panda_link7"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-2.9670997" upper="2.9670997" effort="720." velocity="2.6099999"/>
+    <limit lower="-2.9670997" upper="2.9670997" effort="720." velocity="12.6099999"/>
   </joint>
   <joint name="robot1_rear_laser_joint" type="fixed">
     <origin xyz="0.233 0. 0.3932" rpy="1.5707964 -1.5707957 1.5707964"/>

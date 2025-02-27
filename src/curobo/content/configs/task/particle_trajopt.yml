@@ -69,7 +69,7 @@ cost:
     use_sweep_kernel: False
     use_speed_metric: False
     speed_dt: 0.01  # used only for speed metric
-    activation_distance: 0.025
+    activation_distance: 0.2
 
   self_collision_cfg:
     weight: 500.0
@@ -79,15 +79,15 @@ cost:
 
 
 mppi:
-  init_cov          : 0.5
+  init_cov          : 0.01
   gamma             : 1.0
-  n_iters           : 2
+  n_iters           : 20
   cold_start_n_iters: null
   step_size_mean    : 0.9
   step_size_cov     : 0.01
   beta              : 0.01
   alpha             : 1
-  num_particles     : 25 # 100
+  num_particles     : 2500 # 100
   update_cov        : True
   cov_type          : "DIAG_A" #
   kappa             : 0.001

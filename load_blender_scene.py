@@ -37,12 +37,15 @@ from curobo.wrap.reacher.motion_gen import (
 # region Global
 #####################Global Variables#######################
 NUM_ROBOTS = 2
+ROBOT_SEED = 4
 last_success_target = np.zeros(3)
 success_result = None
-curobo_state = np.zeros((NUM_ROBOTS, 12)) 
+curobo_state = np.zeros((NUM_ROBOTS * ROBOT_SEED, 12)) 
 task_finish = True
 cmd_idx = 0
 cmd_trajs = None
+cube_pos_history = np.zeros((2, 3))   
+cmd_step_size = 1
 ############################################################
 
 # region Function
@@ -66,7 +69,7 @@ def get_world_config(objs : List[Entity]) -> WorldConfig:
             name = obj.get_name()
             if "ceiling" in name.lower() or "exterior" in name.lower() or "floor" in name.lower() \
                 or "rug" in name.lower() or "door" in name.lower() or "window" in name.lower() or \
-                    "open" in name.lower():
+                    "open" in name.lower() or "hoof" in name.lower():
                 continue
             if "0/0" in name.lower() and "wall" not in name.lower():
                 continue
@@ -87,6 +90,7 @@ def get_world_config(objs : List[Entity]) -> WorldConfig:
                 ignore_asset_id.append(id)
                 print(f"********* {name}", " id", id)
                 continue
+            
             # faces = []
             # for polygon in blender_mesh.polygons:
             #     face_vertices = polygon.vertices[:]
@@ -105,7 +109,7 @@ def get_world_config(objs : List[Entity]) -> WorldConfig:
             pose = Pose.from_matrix(tensor_mat).tolist()
 
 
-            # print(f"name {name}, vertices num: {vertices.shape}  faces num: {len(faces)}")
+            print(f"name {name}, vertices num: {vertices.shape}  faces num: {len(faces)} {matrix_world[:3, 3]}")
 
             curobo_mesh = Mesh(
                 name=name,
@@ -183,21 +187,22 @@ def set_robots_state(robots :  List[URDFObject], state : np.ndarray):
     for i, robot in enumerate(robots):
         robot.set_location(state[i][:3]) #x y z
         robot.set_rotation_euler([0, 0, state[i][3]]) #yaw
-        curobo_state[i][:2] = state[i][:2] # x y
-        curobo_state[i][2] = state[i][3] # yaw
+        curobo_state[i * ROBOT_SEED : (i + 1) * ROBOT_SEED, :2] = state[i][:2] # x y
+        curobo_state[i * ROBOT_SEED : (i + 1) * ROBOT_SEED, 2] = state[i][3] # yaw
         for j, link in enumerate(robot.get_links_with_revolute_joints()):
             robot.set_rotation_euler_fk(link, rotation_euler=state[i][j+BASE_SHIFT], mode='absolute')
-            curobo_state[i][j+3] = state[i][j+BASE_SHIFT] # joint angles
+            curobo_state[i * ROBOT_SEED : (i + 1) * ROBOT_SEED, j+3] = state[i][j+BASE_SHIFT] # joint angles
             
 # region Callback
 def motion_plan_callback():
-    global last_success_target, cmd_idx, cmd_trajs, task_finish
-    print(f"Motion plan is running... Cube position: {cube.get_location()}. task_finish: {task_finish}")
+    global last_success_target, cmd_idx, cmd_trajs, task_finish, cube_pos_history, cmd_step_size
+    print(f"Motion plan is running... Cube position: {cube.get_location()}. task_finish: {task_finish} \
+        cmd_idx{cmd_idx}/{cmd_trajs.shape[1] if cmd_trajs is not None else 0}")
     
     #######################################motion control################################################
     if cmd_trajs is not None and not task_finish:
         set_robots_state(robots, cmd_trajs[:, cmd_idx])
-        cmd_idx += 1
+        cmd_idx += cmd_step_size
         if cmd_idx >= cmd_trajs.shape[1]:
             task_finish = True
             cmd_idx = 0
@@ -206,55 +211,60 @@ def motion_plan_callback():
     #####################################################################################################
     cube_position = cube.get_location()
     cube_position[2] = np.clip(cube_position[2], 0.4, 1.0)
-    if np.linalg.norm(cube_position - last_success_target) > 0.2:
+    if np.linalg.norm(cube_position - last_success_target) > 0.2 and \
+        np.linalg.norm(cube_pos_history[0] - cube_position) == 0.0:
         ik_goal = Pose(
             position=tensor_args.to_device(cube_position),
             quaternion=tensor_args.to_device([0, 1, 0, 0]),
         )
-        print(f"start motion plan")
         curobo_joint_state = JointState.from_position(tensor_args.to_device(curobo_state[:, :10]), joint_names=motion_gen.rollout_fn.joint_names)
-        tt = time.time()
-        # import ipdb; ipdb.set_trace()
-        try:
-            result = motion_gen.plan_batch(
-                            curobo_joint_state.clone(),
-                            ik_goal.clone().repeat_seeds(NUM_ROBOTS),
-                            plan_config,
-                    )
-        except Exception as e:
-            print("plan inner error",e)
-            return 0.05
-            # import ipdb; ipdb.set_trace()
-        if result.success[0]:
-            cmd_trajs = cs_to_bs(motion_gen.get_full_js(result.optimized_plan).position.cpu().numpy()[:, :, :10])
+
+        result = motion_gen.plan_batch(
+                        curobo_joint_state.clone(),
+                        ik_goal.clone().repeat_seeds(NUM_ROBOTS * ROBOT_SEED),
+                        plan_config,
+                )
+        all_trajs = motion_gen.get_full_js(result.optimized_plan).position.cpu().numpy()[:, :, :10]
+        plan_success = np.zeros(NUM_ROBOTS, dtype=bool)
+        suceess_trajs = []
+        for i in range(NUM_ROBOTS * ROBOT_SEED):
+            if result.success[i] and not plan_success[i // ROBOT_SEED]:
+                plan_success[i // ROBOT_SEED] = True
+                suceess_trajs.append(all_trajs[i])
+        
+        # if all robots has success plan        
+        if np.count_nonzero(plan_success) == NUM_ROBOTS: 
+            cmd_trajs = cs_to_bs(np.array(suceess_trajs))
+            cmd_step_size = cmd_trajs.shape[1] // 32
             cmd_idx = 0
             task_finish = False
             last_success_target = cube_position
-        print(f"result: {result.success} status:{result.status} time:{result.total_time}")
-        print(f"motion plan time: {time.time() - tt}")
+        else:
+            print(f"result.success {result.success}   result.status: {result.status}")
+            
+        print(f"result ik time:{result.ik_time:.3f} graph time:{result.graph_time:.3f} " \
+                f"opt_time:{result.trajopt_time:.3f} finetune:{result.finetune_time:.3f} total:{result.total_time:.3f} " \
+                f"attemps:{result.attempts} opt_attemps:{result.trajopt_attempts}")
         
         if not result.success[0]:
             return 0.05
-    return 3.0  # 每秒调用一次
+    cube_pos_history[0] = cube_pos_history[1]
+    cube_pos_history[1] = cube_position
+    return 1.0  
 
 
 # region Main
 bproc.init()
-
-# load scene
-# objs = bproc.loader.load_blend(
-#     path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_no_plantandshlefobj/14ec7b18/fine/scene.blend",
-#     obj_types=['mesh', 'curve', 'hair', 'armature','empty', 'light', 'camera'],
-#     data_blocks=['armatures', 'cameras', 'collections', 'curves', 'images', 'lights', 'materials', 'meshes', 'objects', 'textures'])
+cube = bproc.object.create_primitive("CUBE", scale=[0.05, 0.05, 0.05], location=[0, 0, 0])
 objs = bproc.loader.load_blend(
+    # path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/527a465e/fine/scene.blend",
     path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_no_plantandshlefobj/14ec7b18/fine/scene.blend",
-    obj_types=['mesh', 'armature', 'camera'],
-    data_blocks=['armatures', 'cameras', 'collections', 'meshes', 'objects'])
+    obj_types=['mesh', 'curve', 'hair', 'armature','empty', 'light', 'camera'],
+    data_blocks=['armatures', 'cameras', 'collections', 'curves', 'images', 'lights', 'materials', 'meshes', 'objects', 'textures'])
 hide_collection("unique_assets:room_exterior")
 hide_collection("unique_assets:room_ceiling")
 bpy.context.window.workspace = bpy.data.workspaces["yuqiang"]
 bpy.context.view_layer.update()
-
 # load robot
 
 robots = []
@@ -282,8 +292,8 @@ set_robots_state(robots, blender_state)
 
 # region Curobo
 setup_curobo_logger("warn")
-n_obstacle_mesh = 400
-n_obstacle_cuboids = 50
+n_obstacle_mesh = 600
+n_obstacle_cuboids = 300
 robot_cfg_path = get_robot_configs_path()
 robot_cfg = load_yaml(join_path(robot_cfg_path, "ridgeback_franka.yml"))["robot_cfg"]
 
@@ -305,8 +315,8 @@ motion_gen_config = MotionGenConfig.load_from_robot_config(
     world_cfg,
     tensor_args,
     collision_checker_type=CollisionCheckerType.MESH,
-    num_trajopt_seeds=12,
-    num_graph_seeds=1,
+    num_trajopt_seeds=64,
+    num_graph_seeds=12,
     interpolation_dt=interpolation_dt,
     collision_cache={"obb": n_obstacle_cuboids, "mesh": n_obstacle_mesh},
     optimize_dt=optimize_dt,
@@ -315,12 +325,12 @@ motion_gen_config = MotionGenConfig.load_from_robot_config(
     trim_steps=trim_steps,
 )
 motion_gen = MotionGen(motion_gen_config)
-motion_gen.warmup(enable_graph=True, warmup_js_trajopt=False, batch=NUM_ROBOTS) 
+motion_gen.warmup(enable_graph=True, warmup_js_trajopt=False, batch=NUM_ROBOTS * ROBOT_SEED) 
 print(f"curobot is ready")
 
 
 plan_config = MotionGenPlanConfig(
-    enable_graph=False,
+    enable_graph=True,
     enable_graph_attempt=2,
     max_attempts=max_attempts,
     enable_finetune_trajopt=enable_finetune_trajopt,
@@ -330,7 +340,7 @@ plan_config = MotionGenPlanConfig(
 curobo_joint_state = JointState.from_position(tensor_args.to_device(curobo_state),joint_names=motion_gen.rollout_fn.joint_names)
 goal_state = motion_gen.rollout_fn.compute_kinematics(curobo_joint_state)
 ee_pose = Pose(goal_state.ee_pos_seq, quaternion=goal_state.ee_quat_seq)
-cube = bproc.object.create_primitive("CUBE", scale=[0.05, 0.05, 0.05], location=ee_pose.position[0].cpu().numpy())
+cube.set_location(ee_pose.position[0].cpu().numpy())
 
 collision_supported_world = WorldConfig.create_collision_support_world(curobo_world_config)
 collision_supported_world.save_world_as_mesh("debug_collision_mesh.obj")

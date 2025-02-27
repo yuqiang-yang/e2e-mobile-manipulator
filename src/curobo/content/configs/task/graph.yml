@@ -28,7 +28,7 @@ model:
 
 
 graph:
-  max_nodes: 5000 # node list
+  max_nodes: 30000 # node list
   steer_delta_buffer: 500 # for steering
   sample_pts: 1500
   node_similarity_distance: 0.1
@@ -39,8 +39,8 @@ graph:
   max_cg_buffer: 1000
   vertex_n : 30
 
-  graph_max_attempts: 10
-  graph_min_attempts: 1 
+  graph_max_attempts: 50
+  graph_min_attempts: 5
   init_nodes: 30
 
   c_max: 1.25

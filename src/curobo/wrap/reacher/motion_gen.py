@@ -168,7 +168,7 @@ class MotionGenConfig:
         robot_cfg: Union[Union[str, Dict], RobotConfig],
         world_model: Optional[Union[Union[str, Dict], WorldConfig]] = None,
         tensor_args: TensorDeviceType = TensorDeviceType(),
-        num_ik_seeds: int = 16,
+        num_ik_seeds: int = 64,
         num_graph_seeds: int = 4,
         num_trajopt_seeds: int = 4,
         num_batch_ik_seeds: int = 16,
@@ -3160,6 +3160,18 @@ class MotionGen(MotionGenConfig):
         start_time = time.time()
         plan_config = plan_config.clone()
         goal_pose = goal_pose.clone()
+        
+        if plan_config.check_start_validity:
+            for i in range(start_state.position.shape[0]):
+                valid_query, status = self.check_start_state(start_state[i])
+                if not valid_query:
+                    result = MotionGenResult(
+                        success=torch.as_tensor([False for _ in solve_state.batch_size], device=self.tensor_args.device),
+                        valid_query=valid_query,
+                        status=status,
+                    )
+                    return result
+        print(f"start state: {start_state.position}")
         if plan_config.pose_cost_metric is not None:
             valid_query = self.update_pose_cost_metric(
                 plan_config.pose_cost_metric, start_state, goal_pose
@@ -3935,6 +3947,7 @@ class MotionGen(MotionGenConfig):
 
             result.graph_time = graph_result.solve_time
             result.solve_time += graph_result.solve_time
+            print(f"graph_success {graph_success} / {solve_state.batch_size}")
             if graph_success > 0:
                 # path = graph_result.interpolated_plan
                 result.graph_plan = graph_result.interpolated_plan

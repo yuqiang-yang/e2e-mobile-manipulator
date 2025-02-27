@@ -410,7 +410,8 @@ class ArmBase(RolloutBase, ArmBaseConfig):
             self_constraint = self.robot_self_collision_constraint.forward(state.robot_spheres)
             constraint_list.append(self_constraint)
         constraint = cat_sum(constraint_list)
-
+        # [DEBUG]
+        self.constraint_list = constraint_list
         feasible = constraint == 0.0
 
         if out_metrics is None:

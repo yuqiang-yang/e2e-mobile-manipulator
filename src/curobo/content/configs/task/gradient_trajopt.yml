@@ -69,7 +69,7 @@ cost:
     use_sweep_kernel: True
     use_speed_metric: True
     speed_dt: 0.01 # used only for speed metric
-    activation_distance: 0.025
+    activation_distance: 0.2
 
 
   self_collision_cfg:
@@ -83,7 +83,7 @@ lbfgs:
   inner_iters: 25
   cold_start_n_iters: null
   min_iters: 25
-  line_search_scale: [0.1,0.3,0.7,1.0]
+  line_search_scale: [0.001,0.005,0.01,0.1,0.3,0.7,1.0]
   fixed_iters: True
   cost_convergence: 0.01
   cost_delta_threshold: 2000.0
@@ -100,7 +100,7 @@ lbfgs:
   use_cuda_update_best_kernel: True
   use_temporal_smooth: False
   sync_cuda_time: True
-  step_scale: 1.0
+  step_scale: 0.98
   last_best: 10
   use_coo_sparse: True
   debug_info:
