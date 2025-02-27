@@ -86,6 +86,9 @@ def get_world_config(objs : List[Entity]) -> WorldConfig:
             vertices = np.array([vertex.co[:] for vertex in blender_mesh.vertices])
             if vertices.shape[0] > 4.0e4:
                 match = re.search(pattern, name)
+                if match is None:
+                    print(f"``````````````````````````````` {name} not match!!!!!!")
+                    continue
                 id = match.group(2)
                 ignore_asset_id.append(id)
                 print(f"********* {name}", " id", id)
@@ -224,6 +227,9 @@ def motion_plan_callback():
                         ik_goal.clone().repeat_seeds(NUM_ROBOTS * ROBOT_SEED),
                         plan_config,
                 )
+        if result.optimized_plan is None:
+            print(f"result.success {result.success}   result.status: {result.status}")
+            return 0.05
         all_trajs = motion_gen.get_full_js(result.optimized_plan).position.cpu().numpy()[:, :, :10]
         plan_success = np.zeros(NUM_ROBOTS, dtype=bool)
         suceess_trajs = []
@@ -258,13 +264,15 @@ bproc.init()
 cube = bproc.object.create_primitive("CUBE", scale=[0.05, 0.05, 0.05], location=[0, 0, 0])
 objs = bproc.loader.load_blend(
     # path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/527a465e/fine/scene.blend",
-    path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_no_plantandshlefobj/14ec7b18/fine/scene.blend",
+    # path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_no_plantandshlefobj/14ec7b18/fine/scene.blend",
+    path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/77f33467/fine/scene.blend",
     obj_types=['mesh', 'curve', 'hair', 'armature','empty', 'light', 'camera'],
     data_blocks=['armatures', 'cameras', 'collections', 'curves', 'images', 'lights', 'materials', 'meshes', 'objects', 'textures'])
 hide_collection("unique_assets:room_exterior")
 hide_collection("unique_assets:room_ceiling")
 bpy.context.window.workspace = bpy.data.workspaces["yuqiang"]
 bpy.context.view_layer.update()
+
 # load robot
 
 robots = []
