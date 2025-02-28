@@ -46,6 +46,8 @@ task_finish = True
 cmd_idx = 0
 cmd_trajs = None
 cmd_step_size = 1
+cube_position = np.zeros(3)
+failure_cnt = 0
 ############################################################
 
 # region Function
@@ -56,24 +58,29 @@ def hide_collection(collection_name):
         collection.hide_render = True
         collection.hide_select = True
 
-def get_world_config(objs : List[Entity]) -> WorldConfig:
+def get_world_config(objs : List[Entity], return_center = False) -> WorldConfig:
     obstacles = {"mesh" : []}
     print("get world config start")
     pattern = r'\((\d+)\)[^()]*\((\d+)\)'
 
     ignore_asset_id = []
     id_to_placeholder_idx = {}
+    
+    room_center = np.zeros(3)
     for i, obj in enumerate(objs):
         if isinstance(obj, MeshObject):
             scale = obj.get_scale()
             name = obj.get_name()
+            if "living-room" in name.lower() and "floor" in name.lower():
+                room_center = obj.get_location()
+                
             if "ceiling" in name.lower() or "exterior" in name.lower() or "floor" in name.lower() \
                 or "rug" in name.lower() or "door" in name.lower() or "window" in name.lower() or \
                     "open" in name.lower() or "hoof" in name.lower():
                 continue
             if "0/0" in name.lower() and "wall" not in name.lower():
                 continue
-
+     
             if "placeholder" in name.lower():
                 match = re.search(pattern, name)
                 id = match.group(2)
@@ -154,6 +161,8 @@ def get_world_config(objs : List[Entity]) -> WorldConfig:
                 
     world_model = WorldConfig(**obstacles)
     
+    if return_center:
+        return world_model, room_center
     return world_model
     
 def get_targets(objs : list, world_ccheck : WorldMeshCollision):
@@ -230,6 +239,48 @@ def get_targets(objs : list, world_ccheck : WorldMeshCollision):
         
     return np.array(target_pose)
 
+def get_init_poses(objs : list, room_center : np.ndarray):
+    # init pose is a pose near the living room and also collision free
+    init_arm_pose = np.array([0.0, -1.3, 0.0, -2.5, 0.0, 1.0, 0.0])
+    MAX_ATTEMPS = 10
+    
+    # first we try the room center
+    check_state = np.zeros(10)
+    check_state[:2] = room_center[:2]
+    check_state[2] = 0.0 #yaw
+    check_state[3:] = init_arm_pose
+    check_state_curobo = JointState.from_position(tensor_args.to_device(check_state), joint_names=motion_gen.rollout_fn.joint_names)
+    valid, _ = motion_gen.check_start_state(check_state_curobo)
+    
+    if valid:
+        return check_state
+    
+    # find the living room center
+    for i in range(MAX_ATTEMPS):
+        # random sample a 2d pos
+        x = np.random.uniform(-0.5 * i, 0.5 * i)
+        y = np.random.uniform(-0.5 * i, 0.5 * i)
+        yaw = np.random.uniform(-np.pi / 2, np.pi / 2)
+        check_state[:2] = room_center[:2] + np.array([x, y])
+        check_state[2] = yaw
+        check_state_curobo = JointState.from_position(tensor_args.to_device(check_state), joint_names=motion_gen.rollout_fn.joint_names)
+        valid, _ = motion_gen.check_start_state(check_state_curobo)
+    
+        if valid:
+            return check_state
+    
+    raise(ValueError("can not find feasible initial pose"))
+    return None
+        
+def select_random_goal(candidates : np.ndarray, threshold = 5.0):
+    for i in range(candidates.shape[0]):
+        idx = np.random.randint(0, candidates.shape[0] - 1)
+        if np.linalg.norm(candidates[idx] - cube_position) > threshold:
+            print(f"select new goal idx {idx} / {candidates.shape[0]}")
+            return np.copy(candidates[idx])
+        
+    raise ValueError("select_random_goal can select feasible goal")
+    
 def cs_to_bs(curobo_state : np.ndarray):
     # blender state是 x y z yaw j1 j2 j3 j4 j5 j6 j7
     # curobo state是 x y yaw j1 j2 j3 j4 j5 j6 j7 0
@@ -259,10 +310,13 @@ def set_robots_state(robots :  List[URDFObject], state : np.ndarray):
             
 # region Callback
 def motion_plan_callback():
-    global last_success_target, cmd_idx, cmd_trajs, task_finish, cube_pos_history, cmd_step_size
+    global last_success_target, cmd_idx, cmd_trajs, task_finish, cmd_step_size, cube_position, failure_cnt
     print(f"Motion plan is running... Cube position: {cube.get_location()}. task_finish: {task_finish} \
         cmd_idx{cmd_idx}/{cmd_trajs.shape[1] if cmd_trajs is not None else 0}")
-    
+    if failure_cnt > 1:
+        cube_position = select_random_goal(target_poses)
+        cube.set_location(cube_position)
+        failure_cnt = 0
     #######################################motion control################################################
     if cmd_trajs is not None and not task_finish:
         set_robots_state(robots, cmd_trajs[:, cmd_idx])
@@ -273,50 +327,54 @@ def motion_plan_callback():
             cmd_trajs = None
         return 0.15
     #####################################################################################################
-    cube_position = cube.get_location()
-    cube_position[2] = np.clip(cube_position[2], 0.4, 1.0)
-    if np.linalg.norm(cube_position - last_success_target) > 0.2 and \
-        np.linalg.norm(cube_pos_history[0] - cube_position) == 0.0:
-        ik_goal = Pose(
-            position=tensor_args.to_device(cube_position),
-            quaternion=tensor_args.to_device([0, 1, 0, 0]),
-        )
-        curobo_joint_state = JointState.from_position(tensor_args.to_device(curobo_state[:, :10]), joint_names=motion_gen.rollout_fn.joint_names)
 
-        result = motion_gen.plan_batch(
-                        curobo_joint_state.clone(),
-                        ik_goal.clone().repeat_seeds(NUM_ROBOTS * ROBOT_SEED),
-                        plan_config,
-                )
-        if result.optimized_plan is None:
-            print(f"result.success {result.success}   result.status: {result.status}")
-            return 0.05
-        all_trajs = motion_gen.get_full_js(result.optimized_plan).position.cpu().numpy()[:, :, :10]
-        plan_success = np.zeros(NUM_ROBOTS, dtype=bool)
-        suceess_trajs = []
-        for i in range(NUM_ROBOTS * ROBOT_SEED):
-            if result.success[i] and not plan_success[i // ROBOT_SEED]:
-                plan_success[i // ROBOT_SEED] = True
-                suceess_trajs.append(all_trajs[i])
+    ik_goal = Pose(
+        position=tensor_args.to_device(cube_position),
+        quaternion=tensor_args.to_device([0, 1, 0, 0]),
+    )
+    curobo_joint_state = JointState.from_position(tensor_args.to_device(curobo_state[:, :10]), joint_names=motion_gen.rollout_fn.joint_names)
+
+    result = motion_gen.plan_batch(
+                    curobo_joint_state.clone(),
+                    ik_goal.clone().repeat_seeds(NUM_ROBOTS * ROBOT_SEED),
+                    plan_config,
+            )
+    if result.optimized_plan is None:
+        print(f"result.success {result.success}   result.status: {result.status}")
+        failure_cnt += 1
+        return 0.05
+    all_trajs = motion_gen.get_full_js(result.optimized_plan).position.cpu().numpy()[:, :, :10]
+    plan_success = np.zeros(NUM_ROBOTS, dtype=bool)
+    suceess_trajs = []
+    for i in range(NUM_ROBOTS * ROBOT_SEED):
+        if result.success[i] and not plan_success[i // ROBOT_SEED]:
+            plan_success[i // ROBOT_SEED] = True
+            suceess_trajs.append(all_trajs[i])
+    
+    # if all robots has success plan        
+    if np.count_nonzero(plan_success) == NUM_ROBOTS: 
+        cmd_trajs = cs_to_bs(np.array(suceess_trajs))
+        cmd_step_size = cmd_trajs.shape[1] // 32
+        cmd_idx = 0
+        task_finish = False
+        last_success_target = cube_position
         
-        # if all robots has success plan        
-        if np.count_nonzero(plan_success) == NUM_ROBOTS: 
-            cmd_trajs = cs_to_bs(np.array(suceess_trajs))
-            cmd_step_size = cmd_trajs.shape[1] // 32
-            cmd_idx = 0
-            task_finish = False
-            last_success_target = cube_position
-        else:
-            print(f"result.success {result.success}   result.status: {result.status}")
-            
-        print(f"result ik time:{result.ik_time:.3f} graph time:{result.graph_time:.3f} " \
-                f"opt_time:{result.trajopt_time:.3f} finetune:{result.finetune_time:.3f} total:{result.total_time:.3f} " \
-                f"attemps:{result.attempts} opt_attemps:{result.trajopt_attempts}")
+        # select a new goal
+        cube_position = select_random_goal(target_poses)
+        cube.set_location(cube_position)
+        failure_cnt = 0
+    else:
+        print(f"result.success {result.success}   result.status: {result.status}")
+        failure_cnt += 1
         
-        if not result.success[0]:
-            return 0.05
-    cube_pos_history[0] = cube_pos_history[1]
-    cube_pos_history[1] = cube_position
+    print(f"result ik time:{result.ik_time:.3f} graph time:{result.graph_time:.3f} " \
+            f"opt_time:{result.trajopt_time:.3f} finetune:{result.finetune_time:.3f} total:{result.total_time:.3f} " \
+            f"attemps:{result.attempts} opt_attemps:{result.trajopt_attempts}")
+    
+    if not result.success[0]:
+        return 0.05
+
+
     return 1.0  
 
 # region args
@@ -327,7 +385,7 @@ args = parser.parse_args()
 
 # region Main
 bproc.init()
-cube = bproc.object.create_primitive("CUBE", scale=[0.05, 0.05, 0.05], location=[0, 0, 0])
+cube = bproc.object.create_primitive("CUBE", scale=[0.1, 0.1, 0.1], location=[0, 0, 0])
 objs = bproc.loader.load_blend(
     args.scene_path,
     obj_types=['mesh', 'curve', 'hair', 'armature','empty', 'light', 'camera'],
@@ -344,7 +402,7 @@ tensor_args = TensorDeviceType()
 get_world_config(objs)
 urdf_file="/ssd/yangyuqiang/curobo/src/curobo/content/assets/robot/ridgeback_franka/RidgebackFranka.urdf"
 with concurrent.futures.ThreadPoolExecutor() as executor:
-    futures = [executor.submit(get_world_config, objs)]
+    futures = [executor.submit(get_world_config, objs, True)]
     
     for i in range(NUM_ROBOTS):
         robot = bproc.loader.load_urdf(urdf_file="/ssd/yangyuqiang/curobo/src/curobo/content/assets/robot/ridgeback_franka/RidgebackFranka.urdf" + str(i))
@@ -352,7 +410,7 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
         robots.append(robot)
 
     for future in concurrent.futures.as_completed(futures):
-        curobo_world_config = future.result()
+        curobo_world_config, room_center = future.result()
     
 
 # region Curobo
@@ -371,7 +429,7 @@ trajopt_dt = None
 optimize_dt = False
 trajopt_tsteps = 32
 trim_steps = None
-max_attempts = 4
+max_attempts = 2
 interpolation_dt = 0.05
 enable_finetune_trajopt = False             
 
@@ -401,30 +459,29 @@ plan_config = MotionGenPlanConfig(
     enable_finetune_trajopt=enable_finetune_trajopt,
 )
 
-# add the target cube
-curobo_joint_state = JointState.from_position(tensor_args.to_device(curobo_state),joint_names=motion_gen.rollout_fn.joint_names)
-goal_state = motion_gen.rollout_fn.compute_kinematics(curobo_joint_state)
-ee_pose = Pose(goal_state.ee_pos_seq, quaternion=goal_state.ee_quat_seq)
-cube.set_location(ee_pose.position[0].cpu().numpy())
-
 collision_supported_world = WorldConfig.create_collision_support_world(curobo_world_config)
 collision_supported_world.save_world_as_mesh("debug_collision_mesh.obj")
 
 world_collision_config = WorldCollisionConfig(tensor_args, world_model=collision_supported_world)
 world_ccheck = WorldMeshCollision(world_collision_config)
 
+# region Timer
+motion_gen.update_world(curobo_world_config.clone())
+
+
 # get start and desired pose
 target_poses = get_targets(objs, world_ccheck)
+start_pose = get_init_poses(objs, room_center)
+start_pose = np.insert(start_pose, 2, 0.2) # fake z position
+start_pose = np.insert(start_pose, -1, 0.0)
+set_robots_state(robots, start_pose)
 
-init_arm_pose = np.array([0.0, -1.3, 0.0, -2.5, 0.0, 1.0, 0.0 , 0.0])
-blender_state = np.concatenate([start_poses[0] - 0.5, [np.pi/2], init_arm_pose])
-set_robots_state(robots, blender_state)
-
-
-# region Timerg
-print("start update world")
-motion_gen.update_world(curobo_world_config.clone())
-print("finish update world")
+# add the target cube
+curobo_joint_state = JointState.from_position(tensor_args.to_device(curobo_state),joint_names=motion_gen.rollout_fn.joint_names)
+goal_state = motion_gen.rollout_fn.compute_kinematics(curobo_joint_state)
+ee_pose = Pose(goal_state.ee_pos_seq, quaternion=goal_state.ee_quat_seq)
+cube.set_location(ee_pose.position[0].cpu().numpy())
+cube_position = ee_pose.position[0].cpu().numpy()
 timer2 = bpy.app.timers.register(motion_plan_callback)
 
 # while True:
