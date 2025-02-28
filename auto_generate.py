@@ -14,7 +14,8 @@ from blenderproc.python.types.URDFUtility import URDFObject
 from blenderproc.python.types.EntityUtility import Entity, convert_to_entity_subclass
 
 #curobo
-from curobo.geom.sdf.world import CollisionCheckerType
+from curobo.geom.sdf.world import CollisionCheckerType, WorldCollisionConfig, CollisionQueryBuffer
+from curobo.geom.sdf.world_mesh import WorldMeshCollision
 from curobo.geom.types import WorldConfig, Mesh
 from curobo.types.base import TensorDeviceType
 from curobo.types.math import Pose
@@ -109,9 +110,8 @@ def get_world_config(objs : List[Entity]) -> WorldConfig:
             matrix_world = np.array(obj.get_local2world_mat())
             tensor_mat = tensor_args.to_device(matrix_world)
             pose = Pose.from_matrix(tensor_mat).tolist()
-            print(matrix_world)
 
-            print(f"name {name}, vertices num: {vertices.shape}  faces num: {len(faces)} {matrix_world[:3, 3]}")
+            # print(f"name {name}, vertices num: {vertices.shape}  faces num: {len(faces)}")
 
             curobo_mesh = Mesh(
                 name=name,
@@ -156,17 +156,79 @@ def get_world_config(objs : List[Entity]) -> WorldConfig:
     
     return world_model
     
-def get_start_and_goal(objs : list):
-    start_poses = []
-    end_poses = []
+def get_targets(objs : list, world_ccheck : WorldMeshCollision):
+    target_pose = []
+    added_id = []
+    pattern = r'\((\d+)\)[^()]*\((\d+)\)'
+
     for obj in objs:
         if isinstance (obj, MeshObject):
-            # import ipdb; ipdb.set_trace()
-            if "living-room" in obj.get_name() and "floor" in obj.get_name():
-                start_poses.append(obj.get_origin())
-                print(f"hit {obj.get_name()}, location is {obj.get_origin()}" )
-    
-    return start_poses, end_poses
+            name = obj.get_name()
+            match = re.search(pattern, name)
+            if match is not None:
+                id = match.group(2)
+                if id in added_id:
+                    continue
+            # get bounding box 8 points
+            bbox = obj.get_bound_box()
+            w_T_o = obj.get_local2world_mat()
+            
+            bbox_in_local = np.linalg.inv(w_T_o) @ np.concatenate([bbox, np.ones((8, 1))], axis=1).T
+            assert bbox_in_local.shape[1] == 8
+            length, width, height, _ = np.max(bbox_in_local, axis=1) - np.min(bbox_in_local, axis=1)
+            
+            min_z = np.min(bbox[:, 2])
+            max_z = np.max(bbox[:, 2])
+            
+            # ignore all the objects that are not on the ground
+            if min_z > 0.15:
+                print(f"obj {obj.get_name()} with min_z:{min_z} max_z:{max_z} origin {obj.get_location()} is floating. ignore!")
+                continue
+            
+            # ignore small objs
+            if max_z < 0.3 or max_z > 2.6:
+                print(f"obj {obj.get_name()} with min_z:{min_z} max_z:{max_z} origin {obj.get_location()} is on the ground or ceiling. ignore!")
+                continue
+            
+            # check the origin if at the bounding box corner
+            origin_at_corner = False
+            if np.any(np.linalg.norm(bbox_in_local[:3], axis=0) < 6e-2):
+                print("************************************************************************")
+                origin_at_corner = True
+
+            # get the pose   
+            OFFSET = 0.1
+            if max_z > 1.4:
+                candidate_pose = (w_T_o @ np.array([length + OFFSET, width/2 if origin_at_corner else 0, height/2, 1]))[:3]
+            else:
+                candidate_pose = (w_T_o @ np.array([length, width/2 if origin_at_corner else 0, height + OFFSET, 1]))[:3]
+
+            # check collision
+            radius = 0.1
+            candidate_radius = np.concatenate([candidate_pose, [radius]])
+            candidate_radius = tensor_args.to_device(candidate_radius).view(1, 1, 1, 4)
+            query_buffer = CollisionQueryBuffer.initialize_from_shape(
+            candidate_radius.shape, tensor_args, world_ccheck.collision_types
+            )       
+            act_distance = tensor_args.to_device([0.0])
+
+            weight = tensor_args.to_device([1])
+            collide = world_ccheck.get_sphere_collision(candidate_radius, query_buffer, weight, act_distance)
+            collide = collide.view(1)
+            
+            if collide:
+                continue
+            print(f"obj {obj.get_name()} pass all test and select as candidate {candidate_pose}.  \
+                min_z:{min_z} max_z:{max_z} origin_at_corner:{origin_at_corner}  half:{max_z > 1.4}")
+            candidate_pose[2] = np.clip(candidate_pose[2], 0, 1.5)
+            target_pose.append(candidate_pose)
+            
+            match = re.search(pattern, name)
+            if match is not None:
+                id = match.group(2)
+                added_id.append(id)
+        
+    return np.array(target_pose)
 
 def cs_to_bs(curobo_state : np.ndarray):
     # blender state是 x y z yaw j1 j2 j3 j4 j5 j6 j7
@@ -293,13 +355,6 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
         curobo_world_config = future.result()
     
 
-# get start and desired pose
-start_poses, end_poses = get_start_and_goal(objs)
-
-init_arm_pose = np.array([0.0, -1.3, 0.0, -2.5, 0.0, 1.0, 0.0 , 0.0])
-blender_state = np.concatenate([start_poses[0] - 0.5, [np.pi/2], init_arm_pose])
-set_robots_state(robots, blender_state)
-
 # region Curobo
 setup_curobo_logger("warn")
 n_obstacle_mesh = 600
@@ -354,6 +409,17 @@ cube.set_location(ee_pose.position[0].cpu().numpy())
 
 collision_supported_world = WorldConfig.create_collision_support_world(curobo_world_config)
 collision_supported_world.save_world_as_mesh("debug_collision_mesh.obj")
+
+world_collision_config = WorldCollisionConfig(tensor_args, world_model=collision_supported_world)
+world_ccheck = WorldMeshCollision(world_collision_config)
+
+# get start and desired pose
+target_poses = get_targets(objs, world_ccheck)
+
+init_arm_pose = np.array([0.0, -1.3, 0.0, -2.5, 0.0, 1.0, 0.0 , 0.0])
+blender_state = np.concatenate([start_poses[0] - 0.5, [np.pi/2], init_arm_pose])
+set_robots_state(robots, blender_state)
+
 
 # region Timerg
 print("start update world")
