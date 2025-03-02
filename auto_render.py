@@ -224,7 +224,7 @@ def get_targets(objs: list, world_ccheck: WorldMeshCollision):
 
 def get_init_poses(objs: list, room_center: np.ndarray):
     init_arm_pose = np.array([0.0, -1.3, 0.0, -2.5, 0.0, 1.0, 0.0])
-    MAX_ATTEMPS = 10
+    MAX_ATTEMPS = 50
 
     check_state = np.zeros(10)
     check_state[:2] = room_center[:2]
@@ -232,16 +232,16 @@ def get_init_poses(objs: list, room_center: np.ndarray):
     check_state[3:] = init_arm_pose
     check_state_curobo = JointState.from_position(tensor_args.to_device(check_state), joint_names=motion_gen.rollout_fn.joint_names)
     valid, _ = motion_gen.check_start_state(check_state_curobo)
-
     if valid:
         return check_state
 
     for i in range(MAX_ATTEMPS):
-        x = np.random.uniform(-0.5 * i, 0.5 * i)
-        y = np.random.uniform(-0.5 * i, 0.5 * i)
-        yaw = np.random.uniform(-np.pi / 2, np.pi / 2)
+        max_range = np.clip(0.5*i, 0, 10)
+        x = np.random.uniform(-max_range, max_range)
+        y = np.random.uniform(-max_range, max_range)
+        # yaw = np.random.uniform(-np.pi / 2, np.pi / 2)
         check_state[:2] = room_center[:2] + np.array([x, y])
-        check_state[2] = yaw
+        check_state[2] = 0
         check_state_curobo = JointState.from_position(tensor_args.to_device(check_state), joint_names=motion_gen.rollout_fn.joint_names)
         valid, _ = motion_gen.check_start_state(check_state_curobo)
 
@@ -306,11 +306,11 @@ def render_and_save_images(robots, cmd_trajs, plan_id):
             set_robot_pose_at_frame(robot, cmd_trajs[robot_id, frame_idx], 2 * frame_idx + 1)
             yaw = cmd_trajs[robot_id, frame_idx, 3]
 
-            first_person_position = [0.5, 0, 0.5]
+            first_person_position = [0.5, 0, 0.3]
             robot_pose = create_camera_pose_from_euler(0, yaw, 0, cmd_trajs[robot_id, frame_idx][:3])
             # first_person_pose = create_camera_pose_from_euler(np.pi / 2, yaw, 0, transform_point(robot_pose, first_person_position))
             first_person_pose = bproc.math.build_transformation_mat(transform_point(robot_pose, first_person_position), [np.pi / 2, 0, yaw - np.pi/2])
-            third_person_position = [-1.5, 0, 1.5]
+            third_person_position = [-0.7, 0, 1.5]
             # third_person_pose = create_camera_pose_from_euler(np.pi / 3, yaw, 0, transform_point(robot_pose, third_person_position))
             third_person_pose = bproc.math.build_transformation_mat(transform_point(robot_pose, third_person_position), [np.pi / 3, 0, yaw - np.pi/2])
             bproc.camera.add_camera_pose(first_person_pose, frame=2 * frame_idx)
@@ -319,25 +319,47 @@ def render_and_save_images(robots, cmd_trajs, plan_id):
             
         frame_start = bpy.context.scene.frame_start
         frame_end = bpy.context.scene.frame_end
-        print(f"Render Start Frame: {frame_start}")
-        print(f"Render End Frame: {frame_end}")
-
         data = bproc.renderer.render()
 
         os.makedirs(os.path.join(robot_output_dir, "rgb", "first"), exist_ok=True)
         os.makedirs(os.path.join(robot_output_dir, "depth", "first"), exist_ok=True)
         os.makedirs(os.path.join(robot_output_dir, "rgb", "third"), exist_ok=True)
         os.makedirs(os.path.join(robot_output_dir, "depth", "third"), exist_ok=True)
+        first_rgb_writer = cv2.VideoWriter(os.path.join(robot_output_dir, "first_rgb.mp4"), 
+                        cv2.VideoWriter_fourcc(*'x264'), 10, (args.image_width, args.image_height))
+        first_depth_writer = cv2.VideoWriter(os.path.join(robot_output_dir, "first_depth.mp4"), 
+                                    cv2.VideoWriter_fourcc(*'x264'), 10, (args.image_width, args.image_height))
+        third_rgb_writer = cv2.VideoWriter(os.path.join(robot_output_dir, "third_rgb.mp4"), 
+                        cv2.VideoWriter_fourcc(*'x264'), 10, (args.image_width, args.image_height))
+        third_depth_writer = cv2.VideoWriter(os.path.join(robot_output_dir, "third_depth.mp4"), 
+                                    cv2.VideoWriter_fourcc(*'x264'), 10, (args.image_width, args.image_height))
         for frame_idx in range(cmd_trajs.shape[1]):
-            rgb_path_first = os.path.join(robot_output_dir, "rgb", "first" ,f"rgb{frame_idx:03d}.png")
+            rgb_path_first = os.path.join(robot_output_dir, "rgb", "first" ,f"rgb{frame_idx:03d}.jpg")
             depth_path_first = os.path.join(robot_output_dir, "depth", "first", f"depth{frame_idx:03d}.png")
-            cv2.imwrite(rgb_path_first, data["colors"][frame_idx * 2])
-            cv2.imwrite(depth_path_first, data["depth"][frame_idx * 2] * 1000)
+            depth = data["depth"][frame_idx * 2] 
+            rgb = cv2.cvtColor(data["colors"][frame_idx * 2], cv2.COLOR_RGB2BGR)
+            cv2.imwrite(rgb_path_first, rgb)
+            cv2.imwrite(depth_path_first, depth * 1000)
+            depth_normalized = (np.clip(depth / 10.0, 0, 1) * 255.0).astype(np.uint8)
+            first_rgb_writer.write(rgb)
+            depth_colored = cv2.applyColorMap(depth_normalized, cv2.COLORMAP_JET)
+            first_depth_writer.write(depth_colored)
 
-            rgb_path_third = os.path.join(robot_output_dir, "rgb", "third" ,f"rgb{frame_idx:03d}.png")
+            rgb_path_third = os.path.join(robot_output_dir, "rgb", "third" ,f"rgb{frame_idx:03d}.jpg")
             depth_path_third = os.path.join(robot_output_dir, "depth", "third" ,f"depth{frame_idx:03d}.png")
-            cv2.imwrite(rgb_path_third, data["colors"][frame_idx * 2 + 1])
-            cv2.imwrite(depth_path_third, data["depth"][frame_idx * 2 + 1] * 1000)
+            depth = data["depth"][frame_idx * 2 + 1] 
+            rgb = cv2.cvtColor(data["colors"][frame_idx * 2 + 1], cv2.COLOR_RGB2BGR)
+            cv2.imwrite(rgb_path_third, rgb)
+            depth_normalized = (np.clip(depth / 10.0, 0, 1) * 255.0).astype(np.uint8)
+            cv2.imwrite(depth_path_third, depth * 1000)
+            depth_colored = cv2.applyColorMap(depth_normalized, cv2.COLORMAP_JET)
+            third_rgb_writer.write(rgb)
+            third_depth_writer.write(depth_colored)
+        
+        first_rgb_writer.release()
+        first_depth_writer.release()
+        third_rgb_writer.release()
+        third_depth_writer.release()
 
 # endregion
 
@@ -346,8 +368,8 @@ def hide_other_robots(robots: List, current_robot_id: int):
         robot.hide(i != current_robot_id)
 
 def set_robot_pose_at_frame(robot: bproc.types.URDFObject, traj, frame_idx: int):
-    robot.set_location(traj[:3])  # x, y, z
-    robot.set_rotation_euler([0, 0, traj[3]])  # yaw
+    robot.set_location(traj[:3], frame=frame_idx)  # x, y, z
+    robot.set_rotation_euler([0, 0, traj[3]], frame=frame_idx)  # yaw
     for j, link in enumerate(robot.get_links_with_revolute_joints()):
         robot.set_rotation_euler_fk(link, rotation_euler=traj[j + 4], mode='absolute', frame=frame_idx)
 
@@ -424,6 +446,7 @@ def motion_plan_callback():
         last_success_target = cube_position
 
         save_trajectory(cmd_trajs, plan_id)
+        print(f"start state {curobo_joint_state.position[0]}")
         render_and_save_images(robots, cmd_trajs, plan_id)
         cube_position = select_random_goal(target_poses)
         cube.set_location(cube_position)
@@ -446,6 +469,44 @@ def motion_plan_callback():
 
 # endregion
 
+
+def setup_studio_light(studio_light_name, strength=1.0):
+    blender_data_path = bpy.utils.resource_path('LOCAL')
+    studio_light_dir = os.path.join(blender_data_path, "datafiles", "studiolights", "world")
+    
+    studio_light_path = os.path.join(studio_light_dir, f"{studio_light_name}")
+    
+    if not os.path.exists(studio_light_path):
+        raise FileNotFoundError(f"Studio Light 文件未找到: {studio_light_path}")
+    
+    world = bpy.context.scene.world
+    world.use_nodes = True
+    
+    nodes = world.node_tree.nodes
+    nodes.clear()
+    
+    env_texture = nodes.new(type="ShaderNodeTexEnvironment")
+    env_texture.image = bpy.data.images.load(studio_light_path)
+    
+    background = nodes.new(type="ShaderNodeBackground")
+    background.inputs["Strength"].default_value = strength  # 设置环境光强度
+    
+    output = nodes.new(type="ShaderNodeOutputWorld")
+    
+    links = world.node_tree.links
+    links.new(env_texture.outputs["Color"], background.inputs["Color"])
+    links.new(background.outputs["Background"], output.inputs["Surface"])
+
+    print(f"已成功加载 Studio Light: {studio_light_name}")
+    
+def generate_intrinsic(width,height,hfov,vfov):
+    intrinsic = np.eye(3)
+    intrinsic[0][0] = width / (2 * (np.tan(np.deg2rad(hfov)/2)))
+    intrinsic[1][1] = height / (2 * (np.tan(np.deg2rad(vfov)/2)))
+    intrinsic[0][2] = width / 2
+    intrinsic[1][2] = height / 2
+    return intrinsic
+
 # region Main
 
 
@@ -453,6 +514,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--scene_path", type=str, default="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/77f33467/fine/scene.blend")
 #/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door_less_obs/2a14347
 parser.add_argument("--trajs", type=int, default=10)
+parser.add_argument("--image_height",type=int,default=480)
+parser.add_argument("--image_width",type=int,default=640)
+parser.add_argument("--camera_hfov",type=float,default=86)
+parser.add_argument("--camera_vfov",type=float,default=57)
+parser.add_argument("--device",type=int,default=3)
+
 args = parser.parse_args()
 # Extract scene_id from the input scene_path
 scene_id = Path(args.scene_path).parts[-3]
@@ -461,12 +528,14 @@ os.makedirs(output_dir, exist_ok=True)
 
 
 bproc.init()
-bproc.renderer.enable_normals_output()
 bproc.renderer.enable_depth_output(activate_antialiasing=False)
-bproc.renderer.set_render_devices(False,"CUDA",6)
-bproc.renderer.set_max_amount_of_samples(2048)
+# bproc.renderer.set_render_devices(False,"CUDA",args.device)
+bpy.context.scene.render.engine = "BLENDER_EEVEE_NEXT"
+camera_intrinsic = generate_intrinsic(args.image_width,args.image_height,args.camera_hfov,args.camera_vfov)
+bproc.camera.set_intrinsics_from_K_matrix(camera_intrinsic,args.image_width,args.image_height)
+setup_studio_light("forest.exr", strength=1.0)
 
-cube = bproc.object.create_primitive("CUBE", scale=[0.1, 0.1, 0.1], location=[0, 0, 0])
+cube = bproc.object.create_primitive("CUBE", scale=[0.01, 0.01, 0.01], location=[0, 0, 0])
 objs = bproc.loader.load_blend(
     args.scene_path,
     obj_types=['mesh', 'curve', 'hair', 'armature', 'empty', 'light', 'camera'],
@@ -495,7 +564,7 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
         curobo_world_config, room_center = future.result()
 setup_curobo_logger("warn")
 n_obstacle_mesh = 600
-n_obstacle_cuboids = 300
+n_obstacle_cuboids = 50
 robot_cfg_path = get_robot_configs_path()
 robot_cfg = load_yaml(join_path(robot_cfg_path, "ridgeback_franka.yml"))["robot_cfg"]
 
@@ -546,16 +615,16 @@ motion_gen.update_world(curobo_world_config.clone())
 
 target_poses = get_targets(objs, world_ccheck)
 start_pose = get_init_poses(objs, room_center)
+
 start_pose = np.insert(start_pose, 2, 0.2)  # fake z position
 start_pose = np.insert(start_pose, -1, 0.0)
 set_robots_state(robots, start_pose)
-
 curobo_joint_state = JointState.from_position(tensor_args.to_device(curobo_state), joint_names=motion_gen.rollout_fn.joint_names)
 goal_state = motion_gen.rollout_fn.compute_kinematics(curobo_joint_state)
 ee_pose = Pose(goal_state.ee_pos_seq, quaternion=goal_state.ee_quat_seq)
 cube.set_location(ee_pose.position[0].cpu().numpy())
 cube_position = ee_pose.position[0].cpu().numpy()
-for _ in range(100):
+for _ in range(1000):
     motion_plan_callback()
 # timer2 = bpy.app.timers.register(motion_plan_callback)
 

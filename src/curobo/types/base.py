@@ -18,7 +18,7 @@ import torch
 
 @dataclass(frozen=True)
 class TensorDeviceType:
-    device: torch.device = torch.device("cuda", 4)
+    device: torch.device = torch.device("cuda", 6)
     dtype: torch.dtype = torch.float32
     collision_geometry_dtype: torch.dtype = torch.float32
     collision_gradient_dtype: torch.dtype = torch.float32

@@ -3166,12 +3166,11 @@ class MotionGen(MotionGenConfig):
                 valid_query, status = self.check_start_state(start_state[i])
                 if not valid_query:
                     result = MotionGenResult(
-                        success=torch.as_tensor([False for _ in solve_state.batch_size], device=self.tensor_args.device),
+                        success=torch.as_tensor([False for _ in range(solve_state.batch_size)], device=self.tensor_args.device),
                         valid_query=valid_query,
                         status=status,
                     )
                     return result
-        print(f"start state: {start_state.position}")
         if plan_config.pose_cost_metric is not None:
             valid_query = self.update_pose_cost_metric(
                 plan_config.pose_cost_metric, start_state, goal_pose
