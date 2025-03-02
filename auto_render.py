@@ -326,13 +326,13 @@ def render_and_save_images(robots, cmd_trajs, plan_id):
         os.makedirs(os.path.join(robot_output_dir, "rgb", "third"), exist_ok=True)
         os.makedirs(os.path.join(robot_output_dir, "depth", "third"), exist_ok=True)
         first_rgb_writer = cv2.VideoWriter(os.path.join(robot_output_dir, "first_rgb.mp4"), 
-                        cv2.VideoWriter_fourcc(*'x264'), 10, (args.image_width, args.image_height))
+                        cv2.VideoWriter_fourcc(*'mp4v'), 10, (args.image_width, args.image_height))
         first_depth_writer = cv2.VideoWriter(os.path.join(robot_output_dir, "first_depth.mp4"), 
-                                    cv2.VideoWriter_fourcc(*'x264'), 10, (args.image_width, args.image_height))
+                                    cv2.VideoWriter_fourcc(*'mp4v'), 10, (args.image_width, args.image_height))
         third_rgb_writer = cv2.VideoWriter(os.path.join(robot_output_dir, "third_rgb.mp4"), 
-                        cv2.VideoWriter_fourcc(*'x264'), 10, (args.image_width, args.image_height))
+                        cv2.VideoWriter_fourcc(*'mp4v'), 10, (args.image_width, args.image_height))
         third_depth_writer = cv2.VideoWriter(os.path.join(robot_output_dir, "third_depth.mp4"), 
-                                    cv2.VideoWriter_fourcc(*'x264'), 10, (args.image_width, args.image_height))
+                                    cv2.VideoWriter_fourcc(*'mp4v'), 10, (args.image_width, args.image_height))
         for frame_idx in range(cmd_trajs.shape[1]):
             rgb_path_first = os.path.join(robot_output_dir, "rgb", "first" ,f"rgb{frame_idx:03d}.jpg")
             depth_path_first = os.path.join(robot_output_dir, "depth", "first", f"depth{frame_idx:03d}.png")
