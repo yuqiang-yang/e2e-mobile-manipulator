@@ -562,7 +562,6 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
 
     for i in range(NUM_ROBOTS):
         robot = bproc.loader.load_urdf(urdf_file=urdf_file + str(i))
-        robot.remove_link_by_index(index=0)
 
         print("load success")
         robots.append(robot)
