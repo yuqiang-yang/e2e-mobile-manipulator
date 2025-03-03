@@ -1,123 +1,123 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<robot name="RidgebackFranka">
-  <joint name="base_to_arm_mount_joint" type="fixed">
+<robot name="robot0_RidgebackFranka">
+  <joint name="robot0_base_to_arm_mount_joint" type="fixed">
     <origin xyz="0.28 0. 0. " rpy="0. 1.5707964 0. "/>
-    <parent link="base_link"/>
-    <child link="arm_mount_link"/>
+    <parent link="robot0_base_link"/>
+    <child link="robot0_arm_mount_link"/>
   </joint>
-  <joint name="dummy_base_prismatic_x_joint" type="prismatic">
+  <joint name="robot0_dummy_base_prismatic_x_joint" type="prismatic">
     <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
-    <parent link="Root"/>
-    <child link="dummy_base_x"/>
+    <parent link="robot0_Root"/>
+    <child link="robot0_dummy_base_x"/>
     <dynamics damping="10.0"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-100.2800293" upper="100.2800293" effort="4800." velocity="15."/>
   </joint>
-  <joint name="dummy_base_prismatic_y_joint" type="prismatic">
+  <joint name="robot0_dummy_base_prismatic_y_joint" type="prismatic">
     <origin xyz="0. 0. 0." rpy="0. 0. 1.5707964"/>
-    <parent link="dummy_base_x"/>
-    <child link="dummy_base_y"/>
+    <parent link="robot0_dummy_base_x"/>
+    <child link="robot0_dummy_base_y"/>
     <dynamics damping="10.0"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-100.2800293" upper="100.2800293" effort="4800." velocity="15."/>
   </joint>
-  <joint name="dummy_base_revolute_z_joint" type="revolute">
+  <joint name="robot0_dummy_base_revolute_z_joint" type="revolute">
     <origin xyz="0. 0. 0." rpy="-1.5707964 -1.5707964 0. "/>
-    <parent link="dummy_base_y"/>
-    <child link="base_link"/>
+    <parent link="robot0_dummy_base_y"/>
+    <child link="robot0_base_link"/>
     <dynamics damping="10.0"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-3.2800208" upper="3.2800208" effort="4800." velocity="15.0000002"/>
   </joint>
-  <joint name="front_laser_joint" type="fixed">
+  <joint name="robot0_front_laser_joint" type="fixed">
     <origin xyz="0.233 0. -0.3932" rpy="0. 1.5707964 0. "/>
-    <parent link="base_link"/>
-    <child link="front_laser"/>
+    <parent link="robot0_base_link"/>
+    <child link="robot0_front_laser"/>
   </joint>
-  <joint name="panda_arm_mount_joint" type="fixed">
+  <joint name="robot0_panda_arm_mount_joint" type="fixed">
     <origin xyz="0.3 0. 0. " rpy="0. 0. 0."/>
-    <parent link="arm_mount_link"/>
-    <child link="RidgebackFranka_panda_link0"/>
+    <parent link="robot0_arm_mount_link"/>
+    <child link="robot0_RidgebackFranka_panda_link0"/>
   </joint>
-  <joint name="panda_finger_joint1" type="prismatic">
+  <joint name="robot0_panda_finger_joint1" type="prismatic">
     <origin xyz="0. 0. 0.0584" rpy="0. 0. 1.5707964"/>
-    <parent link="RidgebackFranka_panda_hand"/>
-    <child link="RidgebackFranka_panda_leftfinger"/>
+    <parent link="robot0_RidgebackFranka_panda_hand"/>
+    <child link="robot0_RidgebackFranka_panda_leftfinger"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="0." upper="0.04" effort="1200." velocity="0.2"/>
   </joint>
-  <joint name="panda_finger_joint2" type="prismatic">
+  <joint name="robot0_panda_finger_joint2" type="prismatic">
     <origin xyz="0. 0. 0.0584" rpy="0. 0. -1.5707964"/>
-    <parent link="RidgebackFranka_panda_hand"/>
-    <child link="RidgebackFranka_panda_rightfinger"/>
+    <parent link="robot0_RidgebackFranka_panda_hand"/>
+    <child link="robot0_RidgebackFranka_panda_rightfinger"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="0." upper="0.04" effort="1200." velocity="0.2"/>
   </joint>
-  <joint name="panda_hand_endeffector_joint" type="fixed">
+  <joint name="robot0_panda_hand_endeffector_joint" type="fixed">
     <origin xyz="0. 0. 0.10335" rpy="0. 0. 0."/>
-    <parent link="RidgebackFranka_panda_hand"/>
-    <child link="endeffector"/>
+    <parent link="robot0_RidgebackFranka_panda_hand"/>
+    <child link="robot0_endeffector"/>
   </joint>
-  <joint name="panda_hand_joint" type="fixed">
+  <joint name="robot0_panda_hand_joint" type="fixed">
     <origin xyz="0.107 0. 0. " rpy="-1.5707964 0.7853981 -1.5707964"/>
-    <parent link="RidgebackFranka_panda_link7"/>
-    <child link="RidgebackFranka_panda_hand"/>
+    <parent link="robot0_RidgebackFranka_panda_link7"/>
+    <child link="robot0_RidgebackFranka_panda_hand"/>
   </joint>
-  <joint name="panda_joint1" type="revolute">
+  <joint name="robot0_panda_joint1" type="revolute">
     <origin xyz="0. 0. 0.333" rpy="0. -1.5707964 0. "/>
-    <parent link="RidgebackFranka_panda_link0"/>
-    <child link="RidgebackFranka_panda_link1"/>
+    <parent link="robot0_RidgebackFranka_panda_link0"/>
+    <child link="robot0_RidgebackFranka_panda_link1"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-2.9670997" upper="2.9670997" effort="5220." velocity="12.1749999"/>
   </joint>
-  <joint name="panda_joint2" type="revolute">
+  <joint name="robot0_panda_joint2" type="revolute">
     <origin xyz="0. 0. 0." rpy="0. 0. 1.5707964"/>
-    <parent link="RidgebackFranka_panda_link1"/>
-    <child link="RidgebackFranka_panda_link2"/>
+    <parent link="robot0_RidgebackFranka_panda_link1"/>
+    <child link="robot0_RidgebackFranka_panda_link2"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-1.8325998" upper="1.8325998" effort="5220." velocity="12.1749999"/>
   </joint>
-  <joint name="panda_joint3" type="revolute">
+  <joint name="robot0_panda_joint3" type="revolute">
     <origin xyz="0. -0.316 0. " rpy="0. 0. -1.5707964"/>
-    <parent link="RidgebackFranka_panda_link2"/>
-    <child link="RidgebackFranka_panda_link3"/>
+    <parent link="robot0_RidgebackFranka_panda_link2"/>
+    <child link="robot0_RidgebackFranka_panda_link3"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-2.9670997" upper="2.9670997" effort="5220." velocity="12.1749999"/>
   </joint>
-  <joint name="panda_joint4" type="revolute">
+  <joint name="robot0_panda_joint4" type="revolute">
     <origin xyz="0. 0. -0.0825" rpy="0. 0. -1.5707964"/>
-    <parent link="RidgebackFranka_panda_link3"/>
-    <child link="RidgebackFranka_panda_link4"/>
+    <parent link="robot0_RidgebackFranka_panda_link3"/>
+    <child link="robot0_RidgebackFranka_panda_link4"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-2.9999998" upper="0.087" effort="5220." velocity="12.1749999"/>
   </joint>
-  <joint name="panda_joint5" type="revolute">
+  <joint name="robot0_panda_joint5" type="revolute">
     <origin xyz="0. 0.384 0.0825" rpy="0. 0. 1.5707964"/>
-    <parent link="RidgebackFranka_panda_link4"/>
-    <child link="RidgebackFranka_panda_link5"/>
+    <parent link="robot0_RidgebackFranka_panda_link4"/>
+    <child link="robot0_RidgebackFranka_panda_link5"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-2.9670997" upper="2.9670997" effort="720." velocity="12.6099999"/>
   </joint>
-  <joint name="panda_joint6" type="revolute">
+  <joint name="robot0_panda_joint6" type="revolute">
     <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
-    <parent link="RidgebackFranka_panda_link5"/>
-    <child link="RidgebackFranka_panda_link6"/>
+    <parent link="robot0_RidgebackFranka_panda_link5"/>
+    <child link="robot0_RidgebackFranka_panda_link6"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-0.0873" upper="2.9999998" effort="720." velocity="12.6099999"/>
   </joint>
-  <joint name="panda_joint7" type="revolute">
+  <joint name="robot0_panda_joint7" type="revolute">
     <origin xyz="0. 0. -0.088" rpy="0. 0. -1.5707964"/>
-    <parent link="RidgebackFranka_panda_link6"/>
-    <child link="RidgebackFranka_panda_link7"/>
+    <parent link="robot0_RidgebackFranka_panda_link6"/>
+    <child link="robot0_RidgebackFranka_panda_link7"/>
     <axis xyz="1. 0. 0."/>
     <limit lower="-2.9670997" upper="2.9670997" effort="720." velocity="12.6099999"/>
   </joint>
-  <joint name="rear_laser_joint" type="fixed">
+  <joint name="robot0_rear_laser_joint" type="fixed">
     <origin xyz="0.233 0. 0.3932" rpy="1.5707964 -1.5707957 1.5707964"/>
-    <parent link="base_link"/>
-    <child link="rear_laser"/>
+    <parent link="robot0_base_link"/>
+    <child link="robot0_rear_laser"/>
   </joint>
-  <link name="RidgebackFranka_panda_hand">
+  <link name="robot0_RidgebackFranka_panda_hand">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="0.5583305"/>
@@ -142,7 +142,7 @@
       </geometry>
     </collision>
   </link>
-  <link name="RidgebackFranka_panda_leftfinger">
+  <link name="robot0_RidgebackFranka_panda_leftfinger">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="0.0140552"/>
@@ -154,12 +154,12 @@
         <mesh filename="meshes/RidgebackFranka_panda_leftfinger_collisions.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
-    <visual>
-      <origin xyz="0.04 0. 0." rpy="0. 0. -1.5707964"/>
+    <!-- <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
       <geometry>
         <mesh filename="meshes/RidgebackFranka_panda_leftfinger_visuals_panda_leftfinger.obj" scale="0.01 0.01 0.01"/>
       </geometry>
-    </visual>
+    </visual> -->
     <collision>
       <origin xyz="0.04 0. 0." rpy="0. 0. -1.5707964"/>
       <geometry>
@@ -167,7 +167,7 @@
       </geometry>
     </collision>
   </link>
-  <link name="RidgebackFranka_panda_link0">
+  <link name="robot0_RidgebackFranka_panda_link0">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="4."/>
@@ -192,7 +192,7 @@
       </geometry>
     </collision>
   </link>
-  <link name="RidgebackFranka_panda_link1">
+  <link name="robot0_RidgebackFranka_panda_link1">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="3."/>
@@ -217,7 +217,7 @@
       </geometry>
     </collision>
   </link>
-  <link name="RidgebackFranka_panda_link2">
+  <link name="robot0_RidgebackFranka_panda_link2">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="3."/>
@@ -242,7 +242,7 @@
       </geometry>
     </collision>
   </link>
-  <link name="RidgebackFranka_panda_link3">
+  <link name="robot0_RidgebackFranka_panda_link3">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="2."/>
@@ -267,7 +267,7 @@
       </geometry>
     </collision>
   </link>
-  <link name="RidgebackFranka_panda_link4">
+  <link name="robot0_RidgebackFranka_panda_link4">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="2."/>
@@ -292,7 +292,7 @@
       </geometry>
     </collision>
   </link>
-  <link name="RidgebackFranka_panda_link5">
+  <link name="robot0_RidgebackFranka_panda_link5">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="2."/>
@@ -317,7 +317,7 @@
       </geometry>
     </collision>
   </link>
-  <link name="RidgebackFranka_panda_link6">
+  <link name="robot0_RidgebackFranka_panda_link6">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="1.5"/>
@@ -342,7 +342,7 @@
       </geometry>
     </collision>
   </link>
-  <link name="RidgebackFranka_panda_link7">
+  <link name="robot0_RidgebackFranka_panda_link7">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="0.5"/>
@@ -367,9 +367,9 @@
       </geometry>
     </collision>
   </link>
-  <link name="RidgebackFranka_panda_rightfinger">
+  <link name="robot0_RidgebackFranka_panda_rightfinger">
     <inertial>
-      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <origin xyz="0.04 0. 0." rpy="0. 0. 0."/>
       <mass value="0.0140552"/>
       <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
     </inertial>
@@ -379,7 +379,12 @@
         <mesh filename="meshes/RidgebackFranka_panda_rightfinger_collisions.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
-
+    <!-- <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/RidgebackFranka_panda_rightfinger_visuals_panda_rightfinger.obj" scale="0.01 0.01 0.01"/>
+      </geometry>
+    </visual> -->
     <collision>
       <origin xyz="0.04 0. 0." rpy="0. 0. -1.5707963"/>
       <geometry>
@@ -387,15 +392,15 @@
       </geometry>
     </collision>
   </link>
-  <link name="Root"/>
-  <link name="arm_mount_link">
+  <link name="robot0_Root"/>
+  <link name="robot0_arm_mount_link">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="0.0001"/>
       <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
     </inertial>
   </link>
-  <link name="base_link">
+  <link name="robot0_base_link">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="165.3040009"/>
@@ -474,28 +479,28 @@
       </geometry>
     </collision>
   </link>
-  <link name="dummy_base_x">
+  <link name="robot0_dummy_base_x">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="0.1"/>
       <inertia ixx="0.1" ixy="0." ixz="0." iyy="0.1" iyz="0." izz="0.1"/>
     </inertial>
   </link>
-  <link name="dummy_base_y">
+  <link name="robot0_dummy_base_y">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="0.1"/>
       <inertia ixx="0.1" ixy="0." ixz="0." iyy="0.1" iyz="0." izz="0.1"/>
     </inertial>
   </link>
-  <link name="endeffector">
+  <link name="robot0_endeffector">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="0.0001"/>
       <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
     </inertial>
   </link>
-  <link name="front_laser">
+  <link name="robot0_front_laser">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="0.13"/>
@@ -520,7 +525,7 @@
       </geometry>
     </collision>
   </link>
-  <link name="rear_laser">
+  <link name="robot0_rear_laser">
     <inertial>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <mass value="0.13"/>

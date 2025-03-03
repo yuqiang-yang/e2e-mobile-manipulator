@@ -72,7 +72,7 @@ robot_cfg:
     self_collision_buffer:
       {
         "base_link": 0.0,
-        "RidgebackFranka_panda_link0": 0.1, 
+        "RidgebackFranka_panda_link0": 0.0, 
         "RidgebackFranka_panda_link1": 0.05, 
         "RidgebackFranka_panda_link2": 0.0,
         "RidgebackFranka_panda_link3": 0.0,
@@ -109,5 +109,5 @@ robot_cfg:
       retract_config: [0, 0, 0, 0, -1.3, 0.0, -2.5, 0.0, 1.0, 0., 0.04, 0.04]
       null_space_weight: [0,0,0,1,1,1,1,1,1,1,1,1]
       cspace_distance_weight: [1,1,1,1,1,1,1,1,1,1,1,1]
-      max_acceleration: 5.0 #15.0
-      max_jerk: 100.0
+      max_acceleration: 1500.0 #15.0
+      max_jerk: 50000.0

@@ -168,7 +168,7 @@ class MotionGenConfig:
         robot_cfg: Union[Union[str, Dict], RobotConfig],
         world_model: Optional[Union[Union[str, Dict], WorldConfig]] = None,
         tensor_args: TensorDeviceType = TensorDeviceType(),
-        num_ik_seeds: int = 16,
+        num_ik_seeds: int = 64,
         num_graph_seeds: int = 4,
         num_trajopt_seeds: int = 4,
         num_batch_ik_seeds: int = 16,
@@ -969,7 +969,7 @@ class MotionGenPlanConfig:
 
     #: use start config as regularization for IK instead of
     #: :meth:`curobo.types.robot.RobotConfig.kinematics.kinematics_config.retract_config`
-    use_start_state_as_retract: bool = True
+    use_start_state_as_retract: bool = False
 
     #: Use a custom pose cost metric for trajectory optimization. This is useful for adding
     #: additional constraints to motion generation, such as constraining the end-effector's motion
@@ -3160,6 +3160,17 @@ class MotionGen(MotionGenConfig):
         start_time = time.time()
         plan_config = plan_config.clone()
         goal_pose = goal_pose.clone()
+        
+        if plan_config.check_start_validity:
+            for i in range(start_state.position.shape[0]):
+                valid_query, status = self.check_start_state(start_state[i])
+                if not valid_query:
+                    result = MotionGenResult(
+                        success=torch.as_tensor([False for _ in range(solve_state.batch_size)], device=self.tensor_args.device),
+                        valid_query=valid_query,
+                        status=status,
+                    )
+                    return result
         if plan_config.pose_cost_metric is not None:
             valid_query = self.update_pose_cost_metric(
                 plan_config.pose_cost_metric, start_state, goal_pose
@@ -3230,8 +3241,15 @@ class MotionGen(MotionGenConfig):
             else:
                 # get success idx:
                 idx = torch.nonzero(result.success).reshape(-1)
-                if len(idx) > 0:
-                    best_result.copy_idx(idx, result)
+                try:
+                    if len(idx) > 0:
+                        best_result.copy_idx(idx, best_result)
+                except Exception as e:
+                    print(e)
+                    import traceback
+                    traceback_info = traceback.format_exc()
+                    print(traceback_info)
+                    import ipdb; ipdb.set_trace()
 
             if (
                 result.status == MotionGenStatus.IK_FAIL and plan_config.ik_fail_return is not None
@@ -3892,7 +3910,7 @@ class MotionGen(MotionGenConfig):
 
         # check for success:
         result = MotionGenResult(
-            ik_result.success,
+            ik_result.success.clone(),
             position_error=ik_result.position_error,
             rotation_error=ik_result.rotation_error,
             ik_time=ik_result.solve_time,
@@ -3935,6 +3953,7 @@ class MotionGen(MotionGenConfig):
 
             result.graph_time = graph_result.solve_time
             result.solve_time += graph_result.solve_time
+            print(f"graph_success {graph_success} / {solve_state.batch_size}")
             if graph_success > 0:
                 # path = graph_result.interpolated_plan
                 result.graph_plan = graph_result.interpolated_plan
