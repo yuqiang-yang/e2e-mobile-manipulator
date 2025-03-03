@@ -63,7 +63,12 @@ def hide_collection(collection_name):
         collection.hide_render = True
         collection.hide_select = True
 
-
+def hide_inertial():
+    for obj in bpy.context.scene.objects:
+        if "finger_inertial" in obj.name or "effector_inertial" in obj.name:
+            obj.hide_viewport = True
+            obj.hide_render = True
+            
 def get_world_config(objs: List[Entity], return_center=False) -> WorldConfig:
     obstacles = {"mesh": []}
     print("get world config start")
@@ -191,9 +196,9 @@ def get_targets(objs: list, world_ccheck: WorldMeshCollision):
             if np.any(np.linalg.norm(bbox_in_local[:3], axis=0) < 6e-2):
                 origin_at_corner = True
 
-            OFFSET = 0.1
+            OFFSET = 0.0
             if max_z > 1.4:
-                candidate_pose = (w_T_o @ np.array([length + OFFSET, width / 2 if origin_at_corner else 0, height / 2, 1]))[:3]
+                candidate_pose = (w_T_o @ np.array([length + 0.1, width / 2 if origin_at_corner else 0, height / 2, 1]))[:3]
             else:
                 candidate_pose = (w_T_o @ np.array([length, width / 2 if origin_at_corner else 0, height + OFFSET, 1]))[:3]
 
@@ -241,6 +246,8 @@ def get_init_poses(objs: list, room_center: np.ndarray):
         y = np.random.uniform(-max_range, max_range)
         # yaw = np.random.uniform(-np.pi / 2, np.pi / 2)
         check_state[:2] = room_center[:2] + np.array([x, y])
+        if check_state[0] < 1.0  or check_state[1] < 1.0 :
+            continue
         check_state[2] = 0
         check_state_curobo = JointState.from_position(tensor_args.to_device(check_state), joint_names=motion_gen.rollout_fn.joint_names)
         valid, _ = motion_gen.check_start_state(check_state_curobo)
@@ -254,7 +261,7 @@ def get_init_poses(objs: list, room_center: np.ndarray):
 def select_random_goal(candidates: np.ndarray, threshold=5.0):
     for i in range(candidates.shape[0]):
         idx = np.random.randint(0, candidates.shape[0] - 1)
-        if np.linalg.norm(candidates[idx] - cube_position) > threshold:
+        if np.linalg.norm(candidates[idx] - last_success_target) > threshold:
             return np.copy(candidates[idx])
     raise ValueError("select_random_goal can select feasible goal")
 
@@ -273,7 +280,6 @@ def set_robots_state(robots: List[URDFObject], state: np.ndarray):
     BASE_SHIFT = 4
     if len(state.shape) == 1:
         state = np.tile(state, (NUM_ROBOTS, 1))
-
     for i, robot in enumerate(robots):
         robot.set_location(state[i][:3])  # x y z
         robot.set_rotation_euler([0, 0, state[i][3]])  # yaw
@@ -512,13 +518,14 @@ def generate_intrinsic(width,height,hfov,vfov):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--scene_path", type=str, default="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/77f33467/fine/scene.blend")
-#/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door_less_obs/2a14347
+#/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door_less_obs/2a14347/fine/scene.blend
+#/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door_less_obs/2a999b63/fine/scene.blend
 parser.add_argument("--trajs", type=int, default=10)
 parser.add_argument("--image_height",type=int,default=480)
 parser.add_argument("--image_width",type=int,default=640)
 parser.add_argument("--camera_hfov",type=float,default=86)
 parser.add_argument("--camera_vfov",type=float,default=57)
-parser.add_argument("--device",type=int,default=3)
+parser.add_argument("--device",type=int,default=6)
 
 args = parser.parse_args()
 # Extract scene_id from the input scene_path
@@ -547,7 +554,7 @@ bpy.context.window.workspace = bpy.data.workspaces["yuqiang"]
 bpy.context.view_layer.update()
 
 robots = []
-tensor_args = TensorDeviceType()
+tensor_args = TensorDeviceType(device=torch.device("cuda", args.device))
 urdf_file = "/ssd/yangyuqiang/curobo/src/curobo/content/assets/robot/ridgeback_franka/RidgebackFranka.urdf"
 
 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -562,6 +569,7 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
 
     for future in concurrent.futures.as_completed(futures):
         curobo_world_config, room_center = future.result()
+hide_inertial()
 setup_curobo_logger("warn")
 n_obstacle_mesh = 600
 n_obstacle_cuboids = 50
@@ -576,9 +584,9 @@ trajopt_dt = None
 optimize_dt = False
 trajopt_tsteps = 32
 trim_steps = None
-max_attempts = 2
+max_attempts = 1
 interpolation_dt = 0.05
-enable_finetune_trajopt = False
+enable_finetune_trajopt = True
 
 motion_gen_config = MotionGenConfig.load_from_robot_config(
     robot_cfg,
@@ -596,7 +604,7 @@ motion_gen_config = MotionGenConfig.load_from_robot_config(
 )
 motion_gen = MotionGen(motion_gen_config)
 motion_gen.warmup(enable_graph=True, warmup_js_trajopt=False, batch=NUM_ROBOTS * ROBOT_SEED)
-print(f"curobot is ready")
+print(f"curobo is ready")
 
 plan_config = MotionGenPlanConfig(
     enable_graph=True,
@@ -624,7 +632,7 @@ goal_state = motion_gen.rollout_fn.compute_kinematics(curobo_joint_state)
 ee_pose = Pose(goal_state.ee_pos_seq, quaternion=goal_state.ee_quat_seq)
 cube.set_location(ee_pose.position[0].cpu().numpy())
 cube_position = ee_pose.position[0].cpu().numpy()
-for _ in range(1000):
+for _ in range(100000):
     motion_plan_callback()
 # timer2 = bpy.app.timers.register(motion_plan_callback)
 

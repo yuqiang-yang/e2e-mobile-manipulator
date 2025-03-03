@@ -969,7 +969,7 @@ class MotionGenPlanConfig:
 
     #: use start config as regularization for IK instead of
     #: :meth:`curobo.types.robot.RobotConfig.kinematics.kinematics_config.retract_config`
-    use_start_state_as_retract: bool = True
+    use_start_state_as_retract: bool = False
 
     #: Use a custom pose cost metric for trajectory optimization. This is useful for adding
     #: additional constraints to motion generation, such as constraining the end-effector's motion
@@ -3241,8 +3241,15 @@ class MotionGen(MotionGenConfig):
             else:
                 # get success idx:
                 idx = torch.nonzero(result.success).reshape(-1)
-                if len(idx) > 0:
-                    best_result.copy_idx(idx, result)
+                try:
+                    if len(idx) > 0:
+                        best_result.copy_idx(idx, best_result)
+                except Exception as e:
+                    print(e)
+                    import traceback
+                    traceback_info = traceback.format_exc()
+                    print(traceback_info)
+                    import ipdb; ipdb.set_trace()
 
             if (
                 result.status == MotionGenStatus.IK_FAIL and plan_config.ik_fail_return is not None

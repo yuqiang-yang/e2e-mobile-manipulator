@@ -56,6 +56,11 @@ def hide_collection(collection_name):
         collection.hide_render = True
         collection.hide_select = True
 
+def hide_inertial():
+    for obj in bpy.context.scene.objects:
+        if "finger_inertial" in obj.name or "effector_inertial" in obj.name:
+            obj.hide_viewport = True
+            obj.hide_render = True
 def get_world_config(objs : List[Entity]) -> WorldConfig:
     obstacles = {"mesh" : []}
     print("get world config start")
@@ -264,8 +269,8 @@ bproc.init()
 cube = bproc.object.create_primitive("CUBE", scale=[0.05, 0.05, 0.05], location=[0, 0, 0])
 objs = bproc.loader.load_blend(
     # path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/527a465e/fine/scene.blend",
-    # path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_no_plantandshlefobj/14ec7b18/fine/scene.blend",
-    path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/77f33467/fine/scene.blend",
+    path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_no_plantandshlefobj/14ec7b18/fine/scene.blend",
+    # path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/77f33467/fine/scene.blend",
     obj_types=['mesh', 'curve', 'hair', 'armature','empty', 'light', 'camera'],
     data_blocks=['armatures', 'cameras', 'collections', 'curves', 'images', 'lights', 'materials', 'meshes', 'objects', 'textures'])
 hide_collection("unique_assets:room_exterior")
@@ -290,6 +295,7 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
     for future in concurrent.futures.as_completed(futures):
         curobo_world_config = future.result()
     
+hide_inertial()
 
 # get start and desired pose
 start_poses, end_poses = get_start_and_goal(objs)
@@ -314,9 +320,9 @@ trajopt_dt = None
 optimize_dt = False
 trajopt_tsteps = 32
 trim_steps = None
-max_attempts = 4
+max_attempts = 2
 interpolation_dt = 0.05
-enable_finetune_trajopt = False             
+enable_finetune_trajopt = True             
 
 motion_gen_config = MotionGenConfig.load_from_robot_config(
     robot_cfg,

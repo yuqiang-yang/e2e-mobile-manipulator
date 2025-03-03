@@ -149,19 +149,19 @@
       <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
     </inertial>
     <visual>
-      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
+      <origin xyz="0.04 0. 0." rpy="0. 0. -1.5707964"/>
       <geometry>
         <mesh filename="meshes/RidgebackFranka_panda_leftfinger_collisions.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
-    <visual>
+    <!-- <visual>
       <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
       <geometry>
         <mesh filename="meshes/RidgebackFranka_panda_leftfinger_visuals_panda_leftfinger.obj" scale="0.01 0.01 0.01"/>
       </geometry>
-    </visual>
+    </visual> -->
     <collision>
-      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
+      <origin xyz="0.04 0. 0." rpy="0. 0. -1.5707964"/>
       <geometry>
         <mesh filename="meshes/RidgebackFranka_panda_leftfinger_collisions.obj" scale="1. 1. 1."/>
       </geometry>
@@ -374,19 +374,19 @@
       <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
     </inertial>
     <visual>
-      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707963"/>
+      <origin xyz="0.04 0. 0." rpy="0. 0. -1.5707963"/>
       <geometry>
         <mesh filename="meshes/RidgebackFranka_panda_rightfinger_collisions.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
-    <visual>
+    <!-- <visual>
       <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
       <geometry>
         <mesh filename="meshes/RidgebackFranka_panda_rightfinger_visuals_panda_rightfinger.obj" scale="0.01 0.01 0.01"/>
       </geometry>
-    </visual>
+    </visual> -->
     <collision>
-      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707963"/>
+      <origin xyz="0.04 0. 0." rpy="0. 0. -1.5707963"/>
       <geometry>
         <mesh filename="meshes/RidgebackFranka_panda_rightfinger_collisions.obj" scale="1. 1. 1."/>
       </geometry>
