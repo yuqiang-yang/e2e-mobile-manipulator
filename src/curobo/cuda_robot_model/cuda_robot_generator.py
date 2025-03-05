@@ -768,7 +768,8 @@ class CudaRobotGenerator(CudaRobotGeneratorConfig):
                 for i in range(n_spheres):
                     padded_radius = collision_spheres[j][i]["radius"] + offset_radius
                     if padded_radius <= 0.0 and padded_radius > -1.0:
-                        padded_radius = 0.001
+                        # padded_radius = 0.001
+                        pass
                     link_spheres[i, :] = tensor_sphere(
                         collision_spheres[j][i]["center"],
                         padded_radius,

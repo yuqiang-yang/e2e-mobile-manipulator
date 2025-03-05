@@ -69,7 +69,7 @@ cost:
     use_sweep_kernel: False
     use_speed_metric: False
     speed_dt: 0.01  # used only for speed metric
-    activation_distance: 0.2
+    activation_distance: 0.025
 
   self_collision_cfg:
     weight: 500.0

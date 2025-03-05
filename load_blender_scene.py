@@ -152,7 +152,7 @@ def obj_to_ply_with_collision_map(obj_file: str, ply_file: str, collision_map: L
     print(f"Saved the result to {ply_file}")
 
     
-def get_world_config(objs: List[Entity], return_center=False) -> WorldConfig:
+def get_world_config(objs: List[Entity], tensor_args, return_center=False) -> WorldConfig:
     obstacles = {"mesh": []}
     print("get world config start")
     pattern = r'\((\d+)\)[^()]*\((\d+)\)'
@@ -310,8 +310,8 @@ def get_init_poses(objs: list, room_center: np.ndarray):
     check_state_curobo = JointState.from_position(tensor_args.to_device(check_state), joint_names=motion_gen.rollout_fn.joint_names)
     valid, _ = motion_gen.check_start_state(check_state_curobo)
     sph_list = motion_gen.kinematics.get_robot_as_spheres(tensor_args.to_device(check_state))
-    for si, s in enumerate(sph_list[0]):
-        bproc.object.create_primitive("SPHERE", scale=[s.radius, s.radius, s.radius], location=s.position)
+    # for si, s in enumerate(sph_list[0]):
+    #     bproc.object.create_primitive("SPHERE", scale=[s.radius, s.radius, s.radius], location=s.position)
     if valid:
         return check_state
 
@@ -396,113 +396,114 @@ def motion_plan_callback():
     cube_pos_history[1] = cube_position
     return 1.0  
 
-
-# region Main
-bproc.init()
-cube = bproc.object.create_primitive("CUBE", scale=[0.05, 0.05, 0.05], location=[0, 0, 0])
-objs = bproc.loader.load_blend(
-    path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/784188a8/fine/scene.blend",
-    # path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_no_plantandshlefobj/14ec7b18/fine/scene.blend",
-    # path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/77f33467/fine/scene.blend",
-    obj_types=['mesh', 'curve', 'hair', 'armature','empty', 'light', 'camera'],
-    data_blocks=['armatures', 'cameras', 'collections', 'curves', 'images', 'lights', 'materials', 'meshes', 'objects', 'textures'])
-hide_collection("unique_assets:room_exterior")
-hide_collection("unique_assets:room_ceiling")
-bpy.context.window.workspace = bpy.data.workspaces["yuqiang"]
-bpy.context.view_layer.update()
-
-# load robot
-
-robots = []
-tensor_args = TensorDeviceType()
-urdf_file="/ssd/yangyuqiang/curobo/src/curobo/content/assets/robot/ridgeback_franka/RidgebackFranka.urdf"
-curobo_world_config, room_center = get_world_config(objs, True)
-# with concurrent.futures.ThreadPoolExecutor() as executor:
-#     futures = [executor.submit(get_world_config, objs, True)]
+if __name__ == '__main__':
     
-for i in range(NUM_ROBOTS):
-    robot = bproc.loader.load_urdf(urdf_file="/ssd/yangyuqiang/curobo/src/curobo/content/assets/robot/ridgeback_franka/RidgebackFranka.urdf" + str(i))
-    print("load success")
-    robots.append(robot)
+    # region Main
+    bproc.init()
+    cube = bproc.object.create_primitive("CUBE", scale=[0.05, 0.05, 0.05], location=[0, 0, 0])
+    objs = bproc.loader.load_blend(
+        path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/50ef8f1e/fine/scene.blend",
+        # path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_no_plantandshlefobj/14ec7b18/fine/scene.blend",
+        # path="/ssd/yangyuqiang/infinigen/outputs/multi_dataset_big_door/77f33467/fine/scene.blend",
+        obj_types=['mesh', 'curve', 'hair', 'armature','empty', 'light', 'camera'],
+        data_blocks=['armatures', 'cameras', 'collections', 'curves', 'images', 'lights', 'materials', 'meshes', 'objects', 'textures'])
+    hide_collection("unique_assets:room_exterior")
+    hide_collection("unique_assets:room_ceiling")
+    bpy.context.window.workspace = bpy.data.workspaces["yuqiang"]
+    bpy.context.view_layer.update()
 
-    # for future in concurrent.futures.as_completed(futures):
-    #     curobo_world_config, room_center = future.result()
-    
-hide_inertial()
+    # load robot
 
+    robots = []
+    tensor_args = TensorDeviceType()
+    urdf_file="/ssd/yangyuqiang/curobo/src/curobo/content/assets/robot/ridgeback_franka/RidgebackFranka.urdf"
+    curobo_world_config, room_center = get_world_config(objs, tensor_args, True)
+    # with concurrent.futures.ThreadPoolExecutor() as executor:
+    #     futures = [executor.submit(get_world_config, objs, True)]
+        
+    for i in range(NUM_ROBOTS):
+        robot = bproc.loader.load_urdf(urdf_file="/ssd/yangyuqiang/curobo/src/curobo/content/assets/robot/ridgeback_franka/RidgebackFranka.urdf" + str(i))
+        print("load success")
+        robots.append(robot)
 
-
-# region Curobo
-setup_curobo_logger("warn")
-n_obstacle_mesh = 2000
-n_obstacle_cuboids = 300
-robot_cfg_path = get_robot_configs_path()
-robot_cfg = load_yaml(join_path(robot_cfg_path, "ridgeback_franka.yml"))["robot_cfg"]
-
-j_names = robot_cfg["kinematics"]["cspace"]["joint_names"]
-default_config = robot_cfg["kinematics"]["cspace"]["retract_config"]
-world_cfg = WorldConfig()
-
-# curobo parameter
-trajopt_dt = None
-optimize_dt = False
-trajopt_tsteps = 32
-trim_steps = None
-max_attempts = 2
-interpolation_dt = 0.05
-enable_finetune_trajopt = True             
-
-motion_gen_config = MotionGenConfig.load_from_robot_config(
-    robot_cfg,
-    world_cfg,
-    tensor_args,
-    collision_checker_type=CollisionCheckerType.MESH,
-    num_trajopt_seeds=64,
-    num_graph_seeds=12,
-    interpolation_dt=interpolation_dt,
-    collision_cache={"obb": n_obstacle_cuboids, "mesh": n_obstacle_mesh},
-    optimize_dt=optimize_dt,
-    trajopt_dt=trajopt_dt,
-    trajopt_tsteps=trajopt_tsteps,
-    trim_steps=trim_steps,
-)
-motion_gen = MotionGen(motion_gen_config)
-motion_gen.warmup(enable_graph=True, warmup_js_trajopt=False, batch=NUM_ROBOTS * ROBOT_SEED) 
-print(f"curobot is ready")
+        # for future in concurrent.futures.as_completed(futures):
+        #     curobo_world_config, room_center = future.result()
+        
+    hide_inertial()
 
 
-plan_config = MotionGenPlanConfig(
-    enable_graph=True,
-    enable_graph_attempt=2,
-    max_attempts=max_attempts,
-    enable_finetune_trajopt=enable_finetune_trajopt,
-)
 
-motion_gen.update_world(curobo_world_config.clone())
+    # region Curobo
+    setup_curobo_logger("warn")
+    n_obstacle_mesh = 2000
+    n_obstacle_cuboids = 300
+    robot_cfg_path = get_robot_configs_path()
+    robot_cfg = load_yaml(join_path(robot_cfg_path, "ridgeback_franka.yml"))["robot_cfg"]
 
-start_pose = get_init_poses(objs, room_center)
+    j_names = robot_cfg["kinematics"]["cspace"]["joint_names"]
+    default_config = robot_cfg["kinematics"]["cspace"]["retract_config"]
+    world_cfg = WorldConfig()
 
-start_pose = np.insert(start_pose, 2, 0.2)  # fake z position
-start_pose = np.insert(start_pose, -1, 0.0)
-set_robots_state(robots, start_pose)
+    # curobo parameter
+    trajopt_dt = None
+    optimize_dt = False
+    trajopt_tsteps = 32
+    trim_steps = None
+    max_attempts = 2
+    interpolation_dt = 0.05
+    enable_finetune_trajopt = True             
 
-# add the target cube
-curobo_joint_state = JointState.from_position(tensor_args.to_device(curobo_state),joint_names=motion_gen.rollout_fn.joint_names)
-goal_state = motion_gen.rollout_fn.compute_kinematics(curobo_joint_state)
-ee_pose = Pose(goal_state.ee_pos_seq, quaternion=goal_state.ee_quat_seq)
-cube.set_location(ee_pose.position[0].cpu().numpy())
+    motion_gen_config = MotionGenConfig.load_from_robot_config(
+        robot_cfg,
+        world_cfg,
+        tensor_args,
+        collision_checker_type=CollisionCheckerType.MESH,
+        num_trajopt_seeds=64,
+        num_graph_seeds=12,
+        interpolation_dt=interpolation_dt,
+        collision_cache={"obb": n_obstacle_cuboids, "mesh": n_obstacle_mesh},
+        optimize_dt=optimize_dt,
+        trajopt_dt=trajopt_dt,
+        trajopt_tsteps=trajopt_tsteps,
+        trim_steps=trim_steps,
+    )
+    motion_gen = MotionGen(motion_gen_config)
+    motion_gen.warmup(enable_graph=True, warmup_js_trajopt=False, batch=NUM_ROBOTS * ROBOT_SEED) 
+    print(f"curobot is ready")
 
-collision_supported_world = WorldConfig.create_collision_support_world(curobo_world_config)
-collision_supported_world.save_world_as_mesh("debug_collision_mesh.obj")
 
-# collision_map = get_collision_map(objs, room_center, motion_gen, tensor_args)
-# obj_to_ply_with_collision_map("debug_collision_mesh.obj", "debug2.ply", collision_map)
+    plan_config = MotionGenPlanConfig(
+        enable_graph=True,
+        enable_graph_attempt=2,
+        max_attempts=max_attempts,
+        enable_finetune_trajopt=enable_finetune_trajopt,
+    )
 
-# region Timerg
-timer2 = bpy.app.timers.register(motion_plan_callback)
+    motion_gen.update_world(curobo_world_config.clone())
 
-# while True:
-#     bpy.context.view_layer.update()
+    start_pose = get_init_poses(objs, room_center)
+
+    start_pose = np.insert(start_pose, 2, 0.2)  # fake z position
+    start_pose = np.insert(start_pose, -1, 0.0)
+    set_robots_state(robots, start_pose)
+
+    # add the target cube
+    curobo_joint_state = JointState.from_position(tensor_args.to_device(curobo_state),joint_names=motion_gen.rollout_fn.joint_names)
+    goal_state = motion_gen.rollout_fn.compute_kinematics(curobo_joint_state)
+    ee_pose = Pose(goal_state.ee_pos_seq, quaternion=goal_state.ee_quat_seq)
+    cube.set_location(ee_pose.position[0].cpu().numpy())
+
+    collision_supported_world = WorldConfig.create_collision_support_world(curobo_world_config)
+    collision_supported_world.save_world_as_mesh("debug_collision_mesh.obj")
+
+    collision_map = get_collision_map(objs, room_center, motion_gen, tensor_args)
+    obj_to_ply_with_collision_map("debug_collision_mesh.obj", "debug2.ply", collision_map)
+
+    # region Timerg
+    timer2 = bpy.app.timers.register(motion_plan_callback)
+
+    # while True:
+    #     bpy.context.view_layer.update()
 
 
-print("finish")
+    print("finish")

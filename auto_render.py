@@ -7,6 +7,7 @@ import argparse
 import os
 import re
 import cv2
+import sys
 from pathlib import Path
 from typing import List
 from scipy.spatial.transform import Rotation as R
@@ -37,6 +38,9 @@ from curobo.wrap.reacher.motion_gen import (
     MotionGenResult
 )
 
+#hack 
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from load_blender_scene import get_collision_map, obj_to_ply_with_collision_map, get_world_config
 # region Global Variables
 NUM_ROBOTS = 2
 ROBOT_SEED = 4
@@ -69,99 +73,6 @@ def hide_inertial():
             obj.hide_viewport = True
             obj.hide_render = True
             
-def get_world_config(objs: List[Entity], return_center=False) -> WorldConfig:
-    obstacles = {"mesh": []}
-    print("get world config start")
-    pattern = r'\((\d+)\)[^()]*\((\d+)\)'
-
-    ignore_asset_id = []
-    id_to_placeholder_idx = {}
-
-    room_center = np.zeros(3)
-    for i, obj in enumerate(objs):
-        if isinstance(obj, MeshObject):
-            scale = obj.get_scale()
-            name = obj.get_name()
-            if "living-room" in name.lower() and "floor" in name.lower():
-                room_center = obj.get_location()
-
-            if "ceiling" in name.lower() or "exterior" in name.lower() or "floor" in name.lower() \
-                    or "rug" in name.lower() or "door" in name.lower() or "window" in name.lower() or \
-                    "open" in name.lower() or "hoof" in name.lower():
-                continue
-            if "0/0" in name.lower() and "wall" not in name.lower():
-                continue
-
-            if "placeholder" in name.lower():
-                match = re.search(pattern, name)
-                id = match.group(2)
-                id_to_placeholder_idx[id] = i
-                continue
-
-            blender_mesh = obj.get_mesh()
-
-            vertices = np.array([vertex.co[:] for vertex in blender_mesh.vertices])
-            if vertices.shape[0] > 4.0e4:
-                match = re.search(pattern, name)
-                if match is None:
-                    continue
-                id = match.group(2)
-                ignore_asset_id.append(id)
-                continue
-
-            faces = np.zeros((len(blender_mesh.polygons), 3))
-            for i, polygon in enumerate(blender_mesh.polygons):
-                faces[i] = polygon.vertices[:3]
-
-            matrix_world = np.array(obj.get_local2world_mat())
-            tensor_mat = tensor_args.to_device(matrix_world)
-            pose = Pose.from_matrix(tensor_mat).tolist()
-
-            curobo_mesh = Mesh(
-                name=name,
-                pose=pose,
-                vertices=vertices.tolist(),
-                faces=faces.tolist(),
-                scale=scale
-            )
-
-            obstacles["mesh"].append(curobo_mesh)
-
-    for id in ignore_asset_id:
-        if id in id_to_placeholder_idx:
-            obj = objs[id_to_placeholder_idx[id]]
-            scale = obj.get_scale()
-            name = obj.get_name()
-
-            blender_mesh = obj.get_mesh()
-
-            vertices = np.array([vertex.co[:] for vertex in blender_mesh.vertices])
-
-            faces = np.zeros((len(blender_mesh.polygons), 3))
-            for i, polygon in enumerate(blender_mesh.polygons):
-                faces[i] = polygon.vertices[:3]
-
-            matrix_world = np.array(obj.get_local2world_mat())
-            tensor_mat = tensor_args.to_device(matrix_world)
-            pose = Pose.from_matrix(tensor_mat).tolist()
-
-            curobo_mesh = Mesh(
-                name=name,
-                pose=pose,
-                vertices=vertices.tolist(),
-                faces=faces.tolist(),
-                scale=scale
-            )
-
-            obstacles["mesh"].append(curobo_mesh)
-
-    world_model = WorldConfig(**obstacles)
-
-    if return_center:
-        return world_model, room_center
-    return world_model
-
-
 def get_targets(objs: list, world_ccheck: WorldMeshCollision):
     target_pose = []
     added_id = []
@@ -193,14 +104,14 @@ def get_targets(objs: list, world_ccheck: WorldMeshCollision):
                 continue
 
             origin_at_corner = False
-            if np.any(np.linalg.norm(bbox_in_local[:3], axis=0) < 6e-2):
+            if np.any(np.linalg.norm(bbox_in_local[:3], axis=0) < 1e-1):
                 origin_at_corner = True
 
             OFFSET = 0.0
             if max_z > 1.4:
-                candidate_pose = (w_T_o @ np.array([length + 0.1, width / 2 if origin_at_corner else 0, height / 2, 1]))[:3]
+                candidate_pose = (w_T_o @ np.array([length + 0.2, width / 2 if origin_at_corner else 0, np.clip(height / 2, 0, 1.0), 1]))[:3]
             else:
-                candidate_pose = (w_T_o @ np.array([length, width / 2 if origin_at_corner else 0, height + OFFSET, 1]))[:3]
+                candidate_pose = (w_T_o @ np.array([length + 0.08, width / 2 if origin_at_corner else 0, height + OFFSET, 1]))[:3]
 
             radius = 0.1
             candidate_radius = np.concatenate([candidate_pose, [radius]])
@@ -557,17 +468,15 @@ robots = []
 tensor_args = TensorDeviceType(device=torch.device("cuda", args.device))
 urdf_file = "/ssd/yangyuqiang/curobo/src/curobo/content/assets/robot/ridgeback_franka/RidgebackFranka.urdf"
 
-with concurrent.futures.ThreadPoolExecutor() as executor:
-    futures = [executor.submit(get_world_config, objs, True)]
+# with concurrent.futures.ThreadPoolExecutor() as executor:
+#     futures = [executor.submit(get_world_config, objs, True)]
+curobo_world_config, room_center = get_world_config(objs, tensor_args, True)
+for i in range(NUM_ROBOTS):
+    robot = bproc.loader.load_urdf(urdf_file=urdf_file + str(i))
+    robots.append(robot)
 
-    for i in range(NUM_ROBOTS):
-        robot = bproc.loader.load_urdf(urdf_file=urdf_file + str(i))
-
-        print("load success")
-        robots.append(robot)
-
-    for future in concurrent.futures.as_completed(futures):
-        curobo_world_config, room_center = future.result()
+    # for future in concurrent.futures.as_completed(futures):
+    #     curobo_world_config, room_center = future.result()
 hide_inertial()
 setup_curobo_logger("warn")
 n_obstacle_mesh = 600
@@ -583,7 +492,7 @@ trajopt_dt = None
 optimize_dt = False
 trajopt_tsteps = 32
 trim_steps = None
-max_attempts = 1
+max_attempts = 2
 interpolation_dt = 0.05
 enable_finetune_trajopt = True
 
@@ -613,14 +522,19 @@ plan_config = MotionGenPlanConfig(
 )
 
 collision_supported_world = WorldConfig.create_collision_support_world(curobo_world_config)
-# collision_supported_world.save_world_as_mesh("debug_collision_mesh.obj")
+motion_gen.update_world(curobo_world_config)
 
+collision_supported_world.save_world_as_mesh(os.path.join(output_dir, "debug_collision_mesh.obj"))
+collision_map = get_collision_map(objs, room_center, motion_gen, tensor_args)
+obj_to_ply_with_collision_map(os.path.join(output_dir, "debug_collision_mesh.obj"), os.path.join(output_dir, "collision.ply"), collision_map)
 world_collision_config = WorldCollisionConfig(tensor_args, world_model=collision_supported_world)
 world_ccheck = WorldMeshCollision(world_collision_config)
 
-motion_gen.update_world(curobo_world_config.clone())
 
 target_poses = get_targets(objs, world_ccheck)
+# for pose in target_poses:
+#     bproc.object.create_primitive("SPHERE", scale=[0.2, 0.2, 0.2], location=pose)
+
 start_pose = get_init_poses(objs, room_center)
 
 start_pose = np.insert(start_pose, 2, 0.2)  # fake z position
@@ -631,6 +545,10 @@ goal_state = motion_gen.rollout_fn.compute_kinematics(curobo_joint_state)
 ee_pose = Pose(goal_state.ee_pos_seq, quaternion=goal_state.ee_quat_seq)
 cube.set_location(ee_pose.position[0].cpu().numpy())
 cube_position = ee_pose.position[0].cpu().numpy()
+
+
+
+print(f"start motion planning")
 for _ in range(100000):
     motion_plan_callback()
 # timer2 = bpy.app.timers.register(motion_plan_callback)
