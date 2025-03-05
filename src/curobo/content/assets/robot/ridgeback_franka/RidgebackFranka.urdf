@@ -11,7 +11,7 @@
     <child link="dummy_base_x"/>
     <dynamics damping="10.0"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-100.2800293" upper="100.2800293" effort="4800." velocity="15."/>
+    <limit lower="-30.2800293" upper="30.2800293" effort="4800." velocity="15."/>
   </joint>
   <joint name="dummy_base_prismatic_y_joint" type="prismatic">
     <origin xyz="0. 0. 0." rpy="0. 0. 1.5707964"/>
@@ -19,7 +19,7 @@
     <child link="dummy_base_y"/>
     <dynamics damping="10.0"/>
     <axis xyz="1. 0. 0."/>
-    <limit lower="-100.2800293" upper="100.2800293" effort="4800." velocity="15."/>
+    <limit lower="-30.2800293" upper="30.2800293" effort="4800." velocity="15."/>
   </joint>
   <joint name="dummy_base_revolute_z_joint" type="revolute">
     <origin xyz="0. 0. 0." rpy="-1.5707964 -1.5707964 0. "/>

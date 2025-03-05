@@ -154,12 +154,12 @@
         <mesh filename="meshes/RidgebackFranka_panda_leftfinger_collisions.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
-    <!-- <visual>
-      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
+    <visual>
+      <origin xyz="0.04 0. 0." rpy="0. 0. -1.5707964"/>
       <geometry>
         <mesh filename="meshes/RidgebackFranka_panda_leftfinger_visuals_panda_leftfinger.obj" scale="0.01 0.01 0.01"/>
       </geometry>
-    </visual> -->
+    </visual>
     <collision>
       <origin xyz="0.04 0. 0." rpy="0. 0. -1.5707964"/>
       <geometry>

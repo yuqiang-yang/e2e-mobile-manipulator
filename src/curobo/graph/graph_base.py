@@ -652,6 +652,9 @@ class GraphPlanBase(GraphConfig):
             path.solve_time = time.time() - start_time
 
         except ValueError as e:
+            import traceback
+            trace_info = traceback.format_exc()
+            print(f"graph fail {trace_info}")
             log_info(e)
             self.reset_buffer()
             torch.cuda.empty_cache()
@@ -659,6 +662,9 @@ class GraphPlanBase(GraphConfig):
             path = GraphResult(success, x_init, x_goal)
             return path
         except RuntimeError as e:
+            import traceback
+            trace_info = traceback.format_exc()
+            print(f"graph fail {trace_info}")
             log_warn(e)
             self.reset_buffer()
             torch.cuda.empty_cache()
